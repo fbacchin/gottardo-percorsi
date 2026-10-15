@@ -103,6 +103,20 @@ def prova_apple_errore():
     rs = apple("t", lambda *a, **k: (503, None))
     assert all(r["esito"] == "errore 503" and r["con_traffico_s"] is None for r in rs)
 
+def prova_tomtom_campioni():
+    from fonti import da_tomtom
+    t = _campione("privati/campioni/tomtom-tunnel.json"); p = _campione("privati/campioni/tomtom-passo.json")
+    rt, rp = da_tomtom("a", t["codice"], t["risposta"]), da_tomtom("b", p["codice"], p["risposta"])
+    assert rt["esito"] == rp["esito"] == "ok" and rp["distanza_m"] > rt["distanza_m"] + 8000
+    assert da_tomtom("c", 400, {"detailedError": {"code": "NO_ROUTE_FOUND"}})["esito"] == "percorso non trovato"
+    assert da_tomtom("c", 403, None)["esito"] == "errore 403"
+
+def prova_tomtom_otto_misure():
+    from fonti import tomtom
+    from config import MISURE
+    rs = tomtom("k", lambda *a, **k: (500, None))
+    assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

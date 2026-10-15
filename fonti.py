@@ -80,3 +80,24 @@ def apple(token, chiama=http):
             tratte[(o, d)] = (risultato("", e["expectedTravelTimeSeconds"], e["staticTravelTimeSeconds"], e["distanceMeters"])
                               if e else risultato("", esito="percorso non trovato"))
     return [componi(nome, o, d, p, tratte) for nome, o, d, p in MISURE]
+
+def _luogo(tappe):
+    return ":".join("%s,%s" % PUNTI[t] for t in tappe)
+
+def da_tomtom(nome, codice, r):
+    if codice == 200 and isinstance(r, dict) and r.get("routes"):
+        s = r["routes"][0]["summary"]
+        return risultato(nome, s["travelTimeInSeconds"], s["noTrafficTravelTimeInSeconds"], s["lengthInMeters"])
+    if codice == 400 and "NO_ROUTE_FOUND" in json.dumps(r or {}):
+        return risultato(nome, esito="percorso non trovato")
+    return risultato(nome, esito=f"errore {codice}")
+
+def tomtom(chiave, chiama=http):
+    """Una richiesta per misura; il passo con il punto del valico come tappa."""
+    out = []
+    for nome, o, d, percorso in MISURE:
+        tappe = [o, VALICO, d] if percorso == "passo" else [o, d]
+        codice, r = chiama("GET", f"https://api.tomtom.com/routing/1/calculateRoute/{_luogo(tappe)}/json"
+                                  f"?traffic=true&computeTravelTimeFor=all&travelMode=car&key={chiave}")
+        out.append(da_tomtom(nome, codice, r))
+    return out
