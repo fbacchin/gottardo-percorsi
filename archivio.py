@@ -60,3 +60,20 @@ def ultime_24h(cartella, nome, adesso):
             with open(p, newline="", encoding="utf-8") as f:
                 righe += [r for r in csv.DictReader(f) if r["ora"] > limite]
     return sorted(righe, key=lambda r: r["ora"], reverse=True)
+
+from config import TETTI
+
+def _periodo(fonte, adesso):
+    return f"{adesso:%Y-%m-%d}" if TETTI[fonte][0] == "giorno" else f"{adesso:%Y-%m}"
+
+def consenti(uso, fonte, quanto, adesso):
+    """Vero se la richiesta resta sotto il tetto. Le fonti senza tetto passano sempre."""
+    if fonte not in TETTI:
+        return True
+    return uso.get(fonte, {}).get(_periodo(fonte, adesso), 0) + quanto <= TETTI[fonte][1] + 1e-9
+
+def registra(uso, fonte, quanto, adesso):
+    """Si registra PRIMA della chiamata: una richiesta fallita può essere addebitata lo stesso."""
+    if fonte in TETTI:
+        k = _periodo(fonte, adesso)
+        uso.setdefault(fonte, {})[k] = round(uso.get(fonte, {}).get(k, 0) + quanto, 4)

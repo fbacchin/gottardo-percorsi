@@ -54,6 +54,21 @@ def prova_scrittura_in_cima_e_mese():
         aggiungi_in_cima(file_mese(d, "apple", nov), INTESTAZIONE, [["2026-11-01 00:15"] + vuota + ["ok"]])
         assert [r["ora"] for r in ultime_24h(d, "apple", nov)] == ["2026-11-01 00:15", "2026-10-31 23:45", "2026-10-31 23:30", "2026-10-31 23:15"]
 
+def prova_quote():
+    from archivio import consenti, registra
+    from config import ZURIGO
+    uso, ott = {}, datetime(2026, 10, 20, 12, 0, tzinfo=ZURIGO)
+    for _ in range(95):
+        assert consenti(uso, "openwebninja", 1, ott); registra(uso, "openwebninja", 1, ott)
+    assert not consenti(uso, "openwebninja", 1, ott)                       # tetto raggiunto
+    assert consenti(uso, "openwebninja", 1, datetime(2026, 11, 1, 0, 0, tzinfo=ZURIGO))   # mese nuovo
+    for _ in range(108): registra(uso, "apify", 0.041, ott)               # 4,428 $
+    assert consenti(uso, "apify", 0.041, ott) is True and (registra(uso, "apify", 0.041, ott) or True)
+    assert not consenti(uso, "apify", 0.041, ott)                          # 4,51 $ > 4,50 $
+    registra(uso, "tomtom", 2000, ott)
+    assert not consenti(uso, "tomtom", 8, ott) and consenti(uso, "tomtom", 8, ott + timedelta(days=1))   # tetto giornaliero
+    assert consenti(uso, "apple", 5, ott)                                  # nessun tetto
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
