@@ -234,10 +234,8 @@ def prova_giro_orarie_tra_un_ora_e_l_altra():
     """Alle :15 la mappa di Google e quelle di Waze usano la misura delle :00, con l'ora scritta sotto il titolo."""
     from config import ZURIGO
     c = _campione("privati/campioni/google-tunnel.json")
-    w = _campione("privati/campioni/openwebninja.json")
     def risposte(metodo, url, intestazioni=None, corpo=None):
         if "googleapis" in url: return c["codice"], c["risposta"]
-        if "openwebninja" in url: return w["codice"], w["risposta"]
         return 503, None
     d = tempfile.mkdtemp()
     env = {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"}
