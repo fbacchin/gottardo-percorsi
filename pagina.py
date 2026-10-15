@@ -133,9 +133,12 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
     # Prima la strada principale con la galleria, poi il ramo del passo sopra. Agli svincoli la corsia «verso nord»
     # del passo scavalca la corsia «verso sud» per raggiungere la sua (cavalcavia). Una freccia per curva e una in quota.
     o.append(f'<rect x="{X["Göschenen"] + 20}" y="{Y_GALLERIA - 10}" width="{X["Airolo"] - X["Göschenen"] - 40}" height="{CORSIA + 20}" rx="6" fill="#3c4043"/>')
+    # In galleria le frecce stanno nel tratto centrale: vicino agli svincoli finirebbero sotto le curve del passo.
+    margine = (CURVA + 15) / (X["Airolo"] - X["Göschenen"])
     for a, b, chiave in (("Erstfeld", "Amsteg", "esterni"), ("Amsteg", "Göschenen", "tunnel"), ("Göschenen", "Airolo", "tunnel"),
                          ("Airolo", "Faido", "tunnel"), ("Faido", "Biasca", "esterni")):
-        corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave))
+        frazioni = (margine + 0.02, 1 - margine - 0.02) if (a, b) == ("Göschenen", "Airolo") else None
+        corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave), frazioni=frazioni)
     corsie(_ramo_passo(), 0, ("NS", "passo"), ("SN", "passo"), "corsia-passo", (0.19, 0.5, 0.81), cavalcavia=True)
     o.extend(frecce)
     sotto_strada = Y_GALLERIA + CORSIA + 24                       # nomi sotto la strada principale: sopra c'è il passo

@@ -365,6 +365,18 @@ def prova_passo_sopra_e_curve():
         angoli = [math.degrees(math.atan2(y2 - y1, x2 - x1)) for (x1, y1), (x2, y2) in zip(p, p[1:])]
         assert max(abs(b - a) for a, b in zip(angoli, angoli[1:])) < 20                                         # niente spigoli
 
+def prova_frecce_fuori_dalle_curve():
+    """Richiesta dell'utente: sulla strada principale nessuna freccia sotto le curve degli svincoli."""
+    import re
+    from pagina import mappa_fonte, X, CURVA, Y_GALLERIA, CORSIA
+    from config import MISURE, ZURIGO
+    svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, {})
+    sulla_strada = [float(x) for x, y in re.findall(r'class="freccia" transform="translate\(([0-9.]+),([0-9.]+)\)', svg)
+                    if abs(float(y) - Y_GALLERIA) < 1 or abs(float(y) - Y_GALLERIA - CORSIA) < 1]
+    for x0, x1 in ((X["Göschenen"], X["Göschenen"] + CURVA), (X["Airolo"] - CURVA, X["Airolo"])):
+        assert not [x for x in sulla_strada if x0 - 5 < x < x1 + 5], (x0, x1)
+    assert len([x for x in sulla_strada if X["Göschenen"] < x < X["Airolo"]]) >= 2 * 2   # in galleria restano frecce in tutti e due i sensi
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
