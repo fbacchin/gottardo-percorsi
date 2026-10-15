@@ -6,12 +6,10 @@ from datetime import datetime, timedelta, timezone
 import fonti
 from archivio import (INTESTAZIONE, INTESTAZIONE_DETTAGLIO, aggiungi_in_cima, consenti, controlla_distanza, file_mese,
                       registra, riga_sintetica, righe_dettaglio, risultato, ultime_24h, ultimi_totali)
-from config import COSTO_APIFY, MISURE, ORARIE, PUBBLICHE, ZURIGO
-from fonti import CAMPI_WAZE
+from config import MISURE, ORARIE, PUBBLICHE, ZURIGO
 from pagina import PASSI_STORIA, mappa_fonte, nome_mappa, pagine
 
-CHIAVI = {"apple": "APPLE_MAPS_PRIVATE_KEY", "tomtom": "TOMTOM_KEY", "google": "GOOGLE_ROUTES_KEY",
-          "openwebninja": "OPENWEBNINJA_KEY", "apify": "APIFY_TOKEN"}
+CHIAVI = {"apple": "APPLE_MAPS_PRIVATE_KEY", "tomtom": "TOMTOM_KEY", "google": "GOOGLE_ROUTES_KEY"}   # Waze tolto il 15.10
 
 def _tutte(esito):
     return [risultato(m[0], esito=esito) for m in MISURE]
@@ -67,26 +65,6 @@ def giro(adesso, env, pubblico, privato, chiama=fonti.http):
     percorsi("apple", len(fonti.richieste_apple()), apple)
     percorsi("tomtom", len(MISURE), lambda: fonti.tomtom(env["TOMTOM_KEY"], chiama))
     percorsi("google", len(MISURE), lambda: fonti.google(env["GOOGLE_ROUTES_KEY"], chiama))
-
-    for fonte, costo, funzione in (("openwebninja", 1, fonti.waze_openwebninja), ("apify", COSTO_APIFY, fonti.waze_apify)):
-        if not attiva(fonte) or not dell_ora:
-            continue
-        try:
-            if not consenti(uso, fonte, costo, quarto):
-                righe, esito = None, "quota esaurita"
-            else:
-                conta(fonte, costo)
-                try:
-                    righe, esito = funzione(env[CHIAVI[fonte]], chiama)
-                except Exception as e:
-                    righe, esito = None, f"errore {type(e).__name__}"
-            # Una riga «vuota» con l'esito (nella colonna tipo) quando non arriva niente: così il buco si vede nel file.
-            dati = ([[ora] + ["" if r[k] is None else r[k] for k in CAMPI_WAZE] for r in righe] if righe
-                    else [[ora, "nessuna coda" if righe == [] else esito] + [""] * (len(CAMPI_WAZE) - 1)])
-            aggiungi_in_cima(file_mese(os.path.join(privato, "dati"), f"waze-{fonte}", quarto), ["ora"] + CAMPI_WAZE, dati)
-            print(fonte, esito, len(righe or []), "righe")
-        except Exception as e:
-            print(fonte, "errore", type(e).__name__)
 
     json.dump(uso, open(p_uso, "w"), indent=1, sort_keys=True)
 

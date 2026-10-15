@@ -58,13 +58,10 @@ def prova_quote():
     from archivio import consenti, registra
     from config import ZURIGO
     uso, ott = {}, datetime(2026, 10, 20, 12, 0, tzinfo=ZURIGO)
-    for _ in range(95):
-        assert consenti(uso, "openwebninja", 1, ott); registra(uso, "openwebninja", 1, ott)
-    assert not consenti(uso, "openwebninja", 1, ott)                       # tetto raggiunto
-    assert consenti(uso, "openwebninja", 1, datetime(2026, 11, 1, 0, 0, tzinfo=ZURIGO))   # mese nuovo
-    for _ in range(108): registra(uso, "apify", 0.041, ott)               # 4,428 $
-    assert consenti(uso, "apify", 0.041, ott) is True and (registra(uso, "apify", 0.041, ott) or True)
-    assert not consenti(uso, "apify", 0.041, ott)                          # 4,51 $ > 4,50 $
+    for _ in range(600):
+        assert consenti(uso, "google", 8, ott); registra(uso, "google", 8, ott)
+    assert not consenti(uso, "google", 8, ott)                             # 4.800: tetto raggiunto
+    assert consenti(uso, "google", 8, datetime(2026, 11, 1, 0, 0, tzinfo=ZURIGO))   # mese nuovo
     registra(uso, "tomtom", 2000, ott)
     assert not consenti(uso, "tomtom", 8, ott) and consenti(uso, "tomtom", 8, ott + timedelta(days=1))   # tetto giornaliero
     assert consenti(uso, "apple", 5, ott)                                  # nessun tetto
@@ -131,23 +128,6 @@ def prova_google_otto_misure():
     from config import MISURE
     rs = google("k", lambda *a, **k: (500, None))
     assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
-
-def prova_waze_campioni():
-    from fonti import righe_openwebninja, riga_apify, CAMPI_WAZE
-    o = _campione("privati/campioni/openwebninja.json")["risposta"]
-    a = _campione("privati/campioni/apify.json")["risposta"]
-    for righe in (righe_openwebninja(o), [riga_apify(x) for x in a]):
-        assert righe, "nessuna riga: area vuota o nomi dei campi sbagliati"
-        assert all(set(r) == set(CAMPI_WAZE) for r in righe)
-        assert all(r["tipo"] in ("coda", "segnalazione") for r in righe)
-        assert all(isinstance(r["lat"], (int, float)) and 46.3 < r["lat"] < 46.9 for r in righe)   # dentro l'area
-        code = [r for r in righe if r["tipo"] == "coda"]
-        assert code and all(r["lunghezza_m"] is not None and r["id"] for r in code)
-
-def prova_waze_errori():
-    from fonti import waze_openwebninja, waze_apify
-    assert waze_openwebninja("k", lambda *a, **k: (429, None)) == (None, "errore 429")
-    assert waze_apify("k", lambda *a, **k: (402, {"error": "x"})) == (None, "errore 402")
 
 def prova_pallini():
     from pagina import pallino
@@ -244,10 +224,11 @@ def prova_giro_cosa_e_dove():
     assert not os.path.exists(pub) or not _tutti_i_file(pub)                   # nel pubblico non si scrive niente
     assert os.path.exists(f"{priv}/mappe/2026-10-16-1715-tomtom.svg") and not glob.glob(f"{priv}/mappe/*-apple.svg")
     assert os.path.exists(f"{priv}/README.md") and os.path.exists(f"{priv}/storia/15.md")
-    pub, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), risposte, {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"})
-    assert os.path.exists(f"{priv}/dati/google-2026-10.csv") and os.path.exists(f"{priv}/dati/waze-openwebninja-2026-10.csv")
+    pub, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), risposte, {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o", "APIFY_TOKEN": "a"})
+    assert os.path.exists(f"{priv}/dati/google-2026-10.csv")
+    assert not glob.glob(f"{priv}/dati/waze-*")                                # Waze non si raccoglie più (richiesta dell'utente, 15.10)
     uso = json.load(open(f"{priv}/uso.json"))
-    assert uso["google"]["2026-10"] == 8 and uso["openwebninja"]["2026-10"] == 1
+    assert uso == {"google": {"2026-10": 8}}
 
 def prova_giro_orarie_tra_un_ora_e_l_altra():
     """Alle :15 la mappa di Google e quelle di Waze usano la misura delle :00, con l'ora scritta sotto il titolo."""
@@ -264,8 +245,7 @@ def prova_giro_orarie_tra_un_ora_e_l_altra():
     _, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 15, tzinfo=ZURIGO), risposte, env, d)
     g = open(f"{priv}/mappe/2026-10-16-1815-google.svg", encoding="utf-8").read()
     assert "misura delle 2026-10-16 18:00" in g and "totale" in g
-    assert not glob.glob(f"{priv}/mappe/*-openwebninja.svg")                    # Waze: solo dati, nessuna mappa
-    assert "2026-10-16 18:00,coda" in open(f"{priv}/dati/waze-openwebninja-2026-10.csv", encoding="utf-8").read()
+    assert not glob.glob(f"{priv}/mappe/*-openwebninja.svg") and not glob.glob(f"{priv}/dati/waze-*")   # Waze: niente
     assert json.load(open(f"{priv}/uso.json"))["google"]["2026-10"] == 8   # alle :15 Google non è stato chiamato
 
 def prova_giro_cancella_mappe_vecchie():
@@ -345,7 +325,7 @@ def prova_giro_errore_a_meta_conta_le_quote():
     finally:
         fonti.da_google = vero
     uso = json.load(open(f"{priv}/uso.json"))
-    assert uso["google"]["2026-10"] == 8 and uso["openwebninja"]["2026-10"] == 1   # contato, e Waze è andato avanti
+    assert uso["google"]["2026-10"] == 8                                        # contato anche se il giro si è rotto dopo
     assert "google errore TypeError" in uscita and os.path.exists(f"{priv}/README.md")
 
 if __name__ == "__main__":

@@ -31,13 +31,3 @@ if sys.argv[1] == "google":
         if via: corpo["intermediates"] = via
         salva(f"privati/campioni/google-{nome}.json", *fonti.http("POST", "https://routes.googleapis.com/directions/v2:computeRoutes",
               {"X-Goog-Api-Key": os.environ["GOOGLE_ROUTES_KEY"], "X-Goog-FieldMask": "routes.duration,routes.staticDuration,routes.distanceMeters"}, corpo))
-
-from config import AREA_WAZE
-if sys.argv[1] == "openwebninja":
-    bl, tr = AREA_WAZE
-    salva("privati/campioni/openwebninja.json", *fonti.http("GET", f"https://api.openwebninja.com/waze/alerts-and-jams?bottom_left={bl}&top_right={tr}&max_alerts=200&max_jams=800", {"x-api-key": os.environ["OPENWEBNINJA_KEY"]}))
-
-if sys.argv[1] == "apify":
-    bl, tr = AREA_WAZE
-    salva("privati/campioni/apify.json", *fonti.http("POST", "https://api.apify.com/v2/acts/sian.agency~waze-traffic-scraper/run-sync-get-dataset-items?memory=256",
-          {"Authorization": "Bearer " + os.environ["APIFY_TOKEN"]}, {"operation": "alertsAndJams", "bottomLeft": bl, "topRight": tr, "maxAlerts": 100, "maxJams": 100}))

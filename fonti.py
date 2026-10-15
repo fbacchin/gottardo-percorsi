@@ -9,8 +9,7 @@ def http(metodo, url, intestazioni=None, corpo=None):
     if dati:
         req.add_header("Content-Type", "application/json")
     try:
-        # Apify esegue l'attore durante la chiamata e lo addebita anche se noi smettiamo di aspettare: margine ampio.
-        with urllib.request.urlopen(req, timeout=300 if "api.apify.com" in url else 60) as r:
+        with urllib.request.urlopen(req, timeout=60) as r:
             testo = r.read()
             return r.status, (json.loads(testo) if testo else None)
     except urllib.error.HTTPError as e:
@@ -134,41 +133,3 @@ def google(chiave, chiama=http):
                            {"X-Goog-Api-Key": chiave, "X-Goog-FieldMask": "routes.duration,routes.staticDuration,routes.distanceMeters"}, corpo)
         out.append(da_google(nome, codice, r))
     return out
-
-from config import AREA_WAZE
-
-CAMPI_WAZE = ["tipo", "sottotipo", "strada", "citta", "lunghezza_m", "velocita_kmh", "livello", "ritardo_s", "lat", "lon", "id"]
-
-def _riga(**campi):
-    return {k: campi.get(k) for k in CAMPI_WAZE}
-
-def _coda(j):
-    inizio = (j.get("line_coordinates") or [{}])[0]
-    return _riga(tipo="coda", sottotipo=j.get("block_alert_type") or j.get("type") or "", strada=j.get("street") or "",
-                 citta=j.get("city") or "", lunghezza_m=j.get("length_meters"), velocita_kmh=j.get("speed_kmh"),
-                 livello=j.get("level"), ritardo_s=j.get("delay_seconds"), lat=inizio.get("lat"), lon=inizio.get("lon"), id=j.get("jam_id"))
-
-def _segnalazione(a):
-    return _riga(tipo="segnalazione", sottotipo=a.get("subtype") or a.get("type") or "", strada=a.get("street") or "",
-                 citta=a.get("city") or "", lat=a.get("latitude"), lon=a.get("longitude"), id=a.get("alert_id"))
-
-def righe_openwebninja(r):
-    d = r.get("data", r) if isinstance(r, dict) else {}
-    return [_coda(j) for j in d.get("jams", [])] + [_segnalazione(a) for a in d.get("alerts", [])]
-
-def riga_apify(x):
-    """Apify restituisce gli stessi campi di OpenWeb Ninja, un elemento per riga con recordType «jam» o «alert»."""
-    return _coda(x) if x.get("recordType") == "jam" else _segnalazione(x)
-
-def waze_openwebninja(chiave, chiama=http):
-    bl, tr = AREA_WAZE
-    codice, r = chiama("GET", f"https://api.openwebninja.com/waze/alerts-and-jams?bottom_left={bl}&top_right={tr}&max_alerts=200&max_jams=800",
-                       {"x-api-key": chiave})
-    return (righe_openwebninja(r), "ok") if codice == 200 and isinstance(r, dict) else (None, f"errore {codice}")
-
-def waze_apify(token, chiama=http):
-    bl, tr = AREA_WAZE
-    codice, r = chiama("POST", "https://api.apify.com/v2/acts/sian.agency~waze-traffic-scraper/run-sync-get-dataset-items?memory=256",
-                       {"Authorization": "Bearer " + token},
-                       {"operation": "alertsAndJams", "bottomLeft": bl, "topRight": tr, "maxAlerts": 100, "maxJams": 100})
-    return ([riga_apify(x) for x in r], "ok") if codice in (200, 201) and isinstance(r, list) else (None, f"errore {codice}")

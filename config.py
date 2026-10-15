@@ -29,17 +29,15 @@ MISURE = [   # prima i percorsi col tunnel, poi quelli sul passo (richiesta dell
 # Fonti i cui dati possono stare nel repository pubblico. Vuoto: Apple vieta di pubblicare i suoi dati,
 # le condizioni di TomTom non sono verificate (Doc/ADEV-773/preliminari.md).
 PUBBLICHE = set()
-ORARIE = {"google", "openwebninja", "apify"}          # le altre girano ogni 15 minuti
+ORARIE = {"google"}                                   # le altre girano ogni 15 minuti
 
 # Soglie dell'app (HistoryChartView.livello): < 1 verde, < 10 giallo, < 40 arancione, oltre rosso.
 SOGLIE = ((1, "🟢"), (10, "🟡"), (40, "🟠"))
 COLORI = {"🟢": "#2fb350", "🟡": "#ffcc00", "🟠": "#ff6f00", "🔴": "#c62828", "⚪": "#d5d8dc"}
 
-# Tetti sotto le quote gratuite: (periodo, limite). Apify si conta in dollari.
-TETTI = {"tomtom": ("giorno", 2000), "google": ("mese", 4800), "openwebninja": ("mese", 95), "apify": ("mese", 4.50)}
-COSTO_APIFY = 0.041   # avvio 0,02 $ + interrogazione area 0,021 $ (livello gratuito, 15.10.2026)
+# Tetti sotto le quote gratuite: (periodo, limite).
+TETTI = {"tomtom": ("giorno", 2000), "google": ("mese", 4800)}
 
-AREA_WAZE = ("46.33,8.50", "46.85,9.00")   # angolo in basso a sinistra, in alto a destra: Erstfeld–Biasca, passo compreso
 
 # Distanza di riferimento per misura (metri), fissata dal primo giro riuscito e controllata a mano.
 # Vuota = nessun controllo. Oltre TOLLERANZA la fonte ha calcolato un'altra strada.
