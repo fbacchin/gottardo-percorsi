@@ -41,8 +41,6 @@ jobs:
           APPLE_MAPS_PRIVATE_KEY: ${{ secrets.APPLE_MAPS_PRIVATE_KEY }}
           TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
           GOOGLE_ROUTES_KEY: ${{ secrets.GOOGLE_ROUTES_KEY }}
-          OPENWEBNINJA_KEY: ${{ secrets.OPENWEBNINJA_KEY }}
-          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: |
           git -C privati config user.name "gottardo-bot"
           git -C privati config user.email "actions@users.noreply.github.com"
