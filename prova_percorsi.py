@@ -313,6 +313,18 @@ def prova_tomtom_429_si_riprova():
     sempre = tomtom("k", lambda *a, **k: (429, None), attesa=lambda s: None)
     assert all(r["esito"] == "errore 429" for r in sempre)                 # dopo i tentativi si arrende, senza inventare
 
+def prova_riferimenti():
+    from config import RIFERIMENTI_M, MISURE
+    from archivio import risultato, controlla_distanza
+    assert set(RIFERIMENTI_M) == {m[0] for m in MISURE}
+    for m in MISURE:
+        if m[3] == "passo":
+            assert RIFERIMENTI_M[m[0]] > RIFERIMENTI_M[m[0].replace("passo", "tunnel")] * 1.05   # le due strade si distinguono
+    # 15.10.2026 17:30, TomTom: «galleria» verso nord sul passo (90,9 km) e «passo» verso sud con 16 km in più (106 km)
+    assert controlla_distanza(risultato("SN Biasca-Erstfeld tunnel", 4553, 4434, 90948))["esito"] == "percorso diverso"
+    assert controlla_distanza(risultato("NS Erstfeld-Biasca passo", 5363, 5245, 105999))["esito"] == "percorso diverso"
+    assert controlla_distanza(risultato("NS Erstfeld-Biasca tunnel", 2928, 2914, 75536))["esito"] == "ok"
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

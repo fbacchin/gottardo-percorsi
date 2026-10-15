@@ -43,5 +43,10 @@ AREA_WAZE = ("46.33,8.50", "46.85,9.00")   # angolo in basso a sinistra, in alto
 
 # Distanza di riferimento per misura (metri), fissata dal primo giro riuscito e controllata a mano.
 # Vuota = nessun controllo. Oltre TOLLERANZA la fonte ha calcolato un'altra strada.
-RIFERIMENTI_M = {}
+RIFERIMENTI_M = {   # Apple Maps, giro del 15.10.2026 17:30 (Google entro il 5 %), approvate dall'utente
+    "NS Erstfeld-Biasca tunnel": 75400, "SN Biasca-Erstfeld tunnel": 76000,
+    "NS Amsteg-Faido tunnel": 50000,    "SN Faido-Amsteg tunnel": 49800,
+    "NS Erstfeld-Biasca passo": 90000,  "SN Biasca-Erstfeld passo": 90600,
+    "NS Amsteg-Faido passo": 64600,     "SN Faido-Amsteg passo": 64400,
+}
 TOLLERANZA = 0.05
