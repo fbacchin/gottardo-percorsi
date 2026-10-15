@@ -101,3 +101,26 @@ def tomtom(chiave, chiama=http):
                                   f"?traffic=true&computeTravelTimeFor=all&travelMode=car&key={chiave}")
         out.append(da_tomtom(nome, codice, r))
     return out
+
+def _punto(n):
+    return {"location": {"latLng": {"latitude": PUNTI[n][0], "longitude": PUNTI[n][1]}}}
+
+def da_google(nome, codice, r):
+    if codice != 200:
+        return risultato(nome, esito=f"errore {codice}")
+    if not isinstance(r, dict) or not r.get("routes"):
+        return risultato(nome, esito="percorso non trovato")
+    x = r["routes"][0]
+    return risultato(nome, int(x["duration"].rstrip("s")), int(x["staticDuration"].rstrip("s")), x["distanceMeters"])
+
+def google(chiave, chiama=http):
+    """Chiave nell'intestazione, mai nell'URL. Il passo con il punto del valico come tappa obbligata (via)."""
+    out = []
+    for nome, o, d, percorso in MISURE:
+        corpo = {"origin": _punto(o), "destination": _punto(d), "travelMode": "DRIVE", "routingPreference": "TRAFFIC_AWARE"}
+        if percorso == "passo":
+            corpo["intermediates"] = [{**_punto(VALICO), "via": True}]
+        codice, r = chiama("POST", "https://routes.googleapis.com/directions/v2:computeRoutes",
+                           {"X-Goog-Api-Key": chiave, "X-Goog-FieldMask": "routes.duration,routes.staticDuration,routes.distanceMeters"}, corpo)
+        out.append(da_google(nome, codice, r))
+    return out

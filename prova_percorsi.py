@@ -117,6 +117,20 @@ def prova_tomtom_otto_misure():
     rs = tomtom("k", lambda *a, **k: (500, None))
     assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
 
+def prova_google_campioni():
+    from fonti import da_google
+    t = _campione("privati/campioni/google-tunnel.json"); p = _campione("privati/campioni/google-passo.json")
+    rt, rp = da_google("a", t["codice"], t["risposta"]), da_google("b", p["codice"], p["risposta"])
+    assert rt["esito"] == rp["esito"] == "ok" and isinstance(rt["con_traffico_s"], int) and rp["distanza_m"] > rt["distanza_m"] + 8000
+    assert da_google("c", 200, {})["esito"] == "percorso non trovato"
+    assert da_google("c", 429, None)["esito"] == "errore 429"
+
+def prova_google_otto_misure():
+    from fonti import google
+    from config import MISURE
+    rs = google("k", lambda *a, **k: (500, None))
+    assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
