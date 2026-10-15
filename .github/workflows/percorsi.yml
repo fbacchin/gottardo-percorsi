@@ -1,0 +1,82 @@
+name: Percorsi Gottardo
+
+# Giri lunghi come il collector di fbacchin/app: GitHub ritarda o salta i cron frequenti.
+# Un run misura agli scatti dei quarti d'ora per ~2 ore e 45 minuti; il job `next` accoda il successivo
+# solo se la raccolta è finita bene (freno contro i run falliti a raffica); il cron è la rete di sicurezza.
+# Il repository è PUBBLICO e anche i log lo sono: giro.py non stampa mai URL né risposte.
+# Tutti i dati vanno nel repository privato fbacchin/gottardo-percorsi-privati (clonato in ./privati).
+# Fermare tutto: gh workflow disable percorsi.yml -R fbacchin/gottardo-percorsi
+on:
+  schedule:
+    - cron: "7 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: percorsi
+  cancel-in-progress: false
+
+jobs:
+  misura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 178
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: fbacchin/gottardo-percorsi-privati
+          token: ${{ secrets.PRIVATI_TOKEN }}
+          path: privati
+      # Il Python di sistema di Ubuntu non accetta pip install (PEP 668): se ne usa uno dedicato.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet "cryptography==50.0.2"
+      - name: Misura ogni 15 minuti per ~2 ore e 45
+        env:
+          APPLE_MAPS_KEY_ID: ${{ secrets.APPLE_MAPS_KEY_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_MAPS_PRIVATE_KEY: ${{ secrets.APPLE_MAPS_PRIVATE_KEY }}
+          TOMTOM_KEY: ${{ secrets.TOMTOM_KEY }}
+          GOOGLE_ROUTES_KEY: ${{ secrets.GOOGLE_ROUTES_KEY }}
+          OPENWEBNINJA_KEY: ${{ secrets.OPENWEBNINJA_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          git -C privati config user.name "gottardo-bot"
+          git -C privati config user.email "actions@users.noreply.github.com"
+          # salva: commit e push del privato, con 3 tentativi dopo rebase (solo questo flusso scrive lì)
+          salva() {
+            git -C privati add -A dati mappe storia README.md uso.json 2>/dev/null
+            git -C privati diff --cached --quiet && return 0
+            git -C privati commit -q -m "percorsi $(date -u +%FT%TZ)"
+            git -C privati push -q origin main && return 0
+            for t in 1 2 3; do
+              sleep $((t * 5))
+              git -C privati fetch -q origin main && git -C privati rebase -q origin/main && git -C privati push -q origin main && return 0
+              git -C privati rebase --abort 2>/dev/null || true
+            done
+            echo "push fallito, riprovo al prossimo giro"
+          }
+          allinea() { sleep $(( 900 - $(date +%s) % 900 )); }
+          # 11 giri: <= 15 min d'attesa iniziale + 10 x 15 min = 165 min < 178
+          allinea
+          for i in $(seq 1 11); do
+            git -C privati fetch -q origin main && git -C privati reset -q --hard origin/main
+            python3 giro.py || echo "giro fallito"
+            salva
+            if [ "$i" -lt 11 ]; then allinea; fi
+          done
+
+  next:
+    needs: misura
+    if: ${{ needs.misura.result == 'success' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run percorsi.yml --ref main -R "$GITHUB_REPOSITORY"
