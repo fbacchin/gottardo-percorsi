@@ -47,20 +47,20 @@ def pallino(v):
             return simbolo
     return "🔴"
 
-def _cella(v):
+def _cella(v, totale=None):
     if v is None or v == "":
         return "⚪ —"
-    return f"{pallino(v)} {'+' if int(v) > 0 else ''}{int(v)}"
+    return f"{pallino(v)} {'+' if int(v) > 0 else ''}{int(v)}" + (f" · {totale} min" if totale is not None else "")
 
-def readme(serie, fonti, ora, extra=""):
+def readme(serie, fonti, ora, extra="", totali=None):
     ultime = {f: (serie.get(f) or [{}])[0] for f in fonti}
     righe = ["# Gottardo — tempi di percorrenza", "",
-             f"Aggiornato alle **{ora}** (ora svizzera). Ritardo in minuti rispetto alla strada libera, tunnel e passo del San Gottardo.", "",
+             f"Aggiornato alle **{ora}** (ora svizzera). Per ogni percorso: ritardo in minuti rispetto alla strada libera · tempo totale di percorrenza.", "",
              "## Adesso", "",
              "| Misura | " + " | ".join(fonti) + " |",
              "|---|" + "---|" * len(fonti)]
     for nome, *_ in MISURE:
-        righe.append(f"| {nome} | " + " | ".join(_cella(ultime[f].get(nome)) for f in fonti) + " |")
+        righe.append(f"| {nome} | " + " | ".join(_cella(ultime[f].get(nome), (totali or {}).get(f, {}).get(nome)) for f in fonti) + " |")
     righe += ["", " · ".join(f"{p} {t}" for p, t in LEGENDA) + " (il motivo è nella colonna «esito» del CSV)", "",
               "## Ultime 24 ore", "", "![Ultime 24 ore](grafico.svg)", ""]
     if extra:
@@ -81,11 +81,12 @@ def _slot(righe, nome, inizio, ampiezza):
                 valori.setdefault(k, r[nome])
     return valori
 
-def grafico(serie, fonti, adesso):
+def grafico(serie, fonti, adesso, totali=None):
     inizio = adesso - timedelta(hours=24) + timedelta(minutes=15)   # l'ultimo quarto d'ora (indice 95) è quello di adesso
     ETICHETTE, LARGO, ALTO, SPAZIO, TITOLO = 210, 8, 9, 2, 34
     blocco = TITOLO + len(fonti) * (ALTO + SPAZIO) + 10
-    W = ETICHETTE + 96 * LARGO + 16
+    DESTRA = 64                                                   # colonna del tempo totale attuale
+    W = ETICHETTE + 96 * LARGO + DESTRA
     H = 20 + len(MISURE) * blocco + 56
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
            f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
@@ -95,6 +96,8 @@ def grafico(serie, fonti, adesso):
         x, t = ETICHETTE + i * LARGO, inizio + timedelta(minutes=15 * i)
         out.append(f'<line x1="{x}" y1="16" x2="{x}" y2="{H - 52}" stroke="#eceef1"/>')
         out.append(f'<text x="{x}" y="{H - 38}" text-anchor="{"end" if i == 96 else "middle"}" fill="#5f6368">{"adesso" if i == 96 else f"{t:%H:%M}"}</text>')
+    if totali:
+        out.append(f'<text x="{ETICHETTE + 96 * LARGO + 8}" y="14" fill="#5f6368" font-size="10">totale</text>')
     y = 20
     for nome, o, d, percorso in MISURE:
         out.append(f'<text x="10" y="{y + 24}" fill="#202124" font-weight="600">{nome}</text>')
@@ -115,6 +118,9 @@ def grafico(serie, fonti, adesso):
                     tratti.append([i, 1, colore])
             for i, n, colore in tratti:
                 out.append(f'<rect x="{ETICHETTE + i * LARGO}" y="{y}" width="{n * LARGO}" height="{ALTO}" fill="{colore}"/>')
+            totale = (totali or {}).get(f, {}).get(nome)
+            if totale is not None:
+                out.append(f'<text x="{ETICHETTE + 96 * LARGO + 8}" y="{y + 8}" fill="#202124" font-size="10">{totale} min</text>')
             y += ALTO + SPAZIO
         y += 10
     x = ETICHETTE                                                 # legenda: il colore non è mai da solo

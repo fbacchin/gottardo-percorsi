@@ -180,6 +180,26 @@ def prova_tappe_del_percorso():
     svg = grafico({}, ["apple"], datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO))
     assert all(n in svg for n in ("Erstfeld", "Amsteg", "Göschenen", "Airolo", "Faido", "Biasca", "Andermatt", "Galleria", "Passo"))
 
+def prova_tempi_totali():
+    from archivio import aggiungi_in_cima, file_mese, righe_dettaglio, risultato, ultimi_totali, INTESTAZIONE_DETTAGLIO
+    from pagina import readme, grafico
+    from config import MISURE, ZURIGO
+    adesso = datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO)
+    with tempfile.TemporaryDirectory() as d:
+        p = file_mese(d, "apple", adesso, "-dettaglio")
+        vecchi = [risultato(m[0], 3000, 2900, 75000) for m in MISURE]
+        nuovi = [risultato(m[0], 3840, 3120, 75000) for m in MISURE]
+        nuovi[1] = risultato(MISURE[1][0], esito="errore 503")
+        aggiungi_in_cima(p, INTESTAZIONE_DETTAGLIO, righe_dettaglio("2026-10-16 17:00", "x", vecchi))
+        aggiungi_in_cima(p, INTESTAZIONE_DETTAGLIO, righe_dettaglio("2026-10-16 17:15", "x", nuovi))
+        totali = ultimi_totali(d, "apple", adesso)
+        assert totali[MISURE[0][0]] == 64 and MISURE[1][0] not in totali     # solo l'ultimo giro, senza le misure fallite
+        riga = {"ora": "2026-10-16 17:15", "esito": "ok", **{m[0]: "12" for m in MISURE}}
+        testo = readme({"apple": [riga]}, ["apple"], "2026-10-16 17:15", totali={"apple": totali})
+        assert f"| {MISURE[0][0]} | 🟠 +12 · 64 min |" in testo
+        svg = grafico({"apple": [riga]}, ["apple"], adesso, totali={"apple": totali})
+        assert ">64 min<" in svg
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

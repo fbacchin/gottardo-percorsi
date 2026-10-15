@@ -77,3 +77,16 @@ def registra(uso, fonte, quanto, adesso):
     if fonte in TETTI:
         k = _periodo(fonte, adesso)
         uso.setdefault(fonte, {})[k] = round(uso.get(fonte, {}).get(k, 0) + quanto, 4)
+
+def ultimi_totali(cartella, nome, adesso):
+    """Tempo totale di percorrenza (minuti, con traffico) dell'ultimo giro, per misura; solo le misure riuscite."""
+    righe = []
+    for quando in (adesso, adesso.replace(day=1) - timedelta(days=1)):
+        p = file_mese(cartella, nome, quando, "-dettaglio")
+        if os.path.exists(p):
+            with open(p, newline="", encoding="utf-8") as f:
+                righe += list(csv.DictReader(f))
+    if not righe:
+        return {}
+    ultima = max(r["ora"] for r in righe)
+    return {r["misura"]: round(int(r["con_traffico_s"]) / 60) for r in righe if r["ora"] == ultima and r["esito"] == "ok"}
