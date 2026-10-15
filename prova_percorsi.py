@@ -351,6 +351,20 @@ def prova_quale_conviene():
     svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, t)
     assert 'font-weight="600">Adesso conviene: verso sud la galleria' in svg
 
+def prova_passo_sopra_e_curve():
+    """Richiesta dell'utente: il passo sopra la strada principale (si sale in montagna), curve morbide agli svincoli."""
+    import re, math
+    from pagina import mappa_fonte, Y_GALLERIA
+    from config import MISURE, ZURIGO
+    svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, {})
+    passo = re.findall(r'<polyline class="corsia-passo" points="([^"]+)"', svg)
+    assert len(passo) == 2
+    for pts in passo:
+        p = [tuple(map(float, c.split(","))) for c in pts.split()]
+        assert len(p) >= 20 and max(y for _, y in p) <= Y_GALLERIA + 14 + 0.5 and min(y for _, y in p) < Y_GALLERIA - 50   # sale sopra
+        angoli = [math.degrees(math.atan2(y2 - y1, x2 - x1)) for (x1, y1), (x2, y2) in zip(p, p[1:])]
+        assert max(abs(b - a) for a, b in zip(angoli, angoli[1:])) < 20                                         # niente spigoli
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

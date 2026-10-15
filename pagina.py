@@ -17,8 +17,20 @@ def pallino(v):
 # tra Göschenen e Airolo due rami: galleria (in alto) e passo (in basso).
 
 X = {"Erstfeld": 110, "Amsteg": 230, "Göschenen": 370, "Airolo": 680, "Faido": 820, "Biasca": 950}
-RAMO_PASSO = [(46.672, 370), (46.636, 440), (46.5588, 520), (46.527, 680)]   # Göschenen, Andermatt, Passo, Airolo
-Y_GALLERIA, Y_PASSO, CORSIA = 78, 158, 14            # y della corsia «verso sud»; quella «verso nord» è CORSIA più in basso
+# Il passo sta SOPRA la strada principale (si sale in montagna): la corsia «verso sud» del ramo è a Y_PASSO.
+Y_GALLERIA, Y_PASSO, CORSIA = 190, 96, 14            # y della corsia «verso sud»; quella «verso nord» è CORSIA più in basso
+CURVA = 110                                          # larghezza delle curve agli svincoli: più stretta e la corsia interna si accartoccia
+X_ANDERMATT, X_VETTA = 450, 525
+
+def _y_ramo(x):
+    """Quota del ramo del passo: sale con una curva morbida (smoothstep) da Göschenen, scende allo stesso modo su Airolo."""
+    x0, x1 = X["Göschenen"], X["Airolo"]
+    t = min(1.0, (x - x0) / CURVA, (x1 - x) / CURVA)
+    t = max(0.0, t)
+    return Y_GALLERIA - (Y_GALLERIA - Y_PASSO) * (3 * t * t - 2 * t ** 3)
+
+def _ramo_passo():
+    return [(float(x), _y_ramo(x)) for x in range(X["Göschenen"], X["Airolo"] + 1, 2)]
 
 def _nome(senso, tratta, percorso):
     lunga = {"NS": "NS Erstfeld-Biasca", "SN": "SN Biasca-Erstfeld"}
@@ -76,8 +88,28 @@ def _frecce(linea, al_contrario, passo=70):
                        f'stroke-linecap="round" stroke-linejoin="round"/>')
     return out
 
+def _frecce_a(linea, al_contrario, frazioni):
+    """Frecce in punti precisi della linea (frazioni della lunghezza), orientate sulla tangente: servono nelle curve."""
+    import math
+    lunghi = [math.hypot(x2 - x1, y2 - y1) for (x1, y1), (x2, y2) in zip(linea, linea[1:])]
+    totale, out = sum(lunghi), []
+    for f in frazioni:
+        resto, i = f * totale, 0
+        while i < len(lunghi) - 1 and resto > lunghi[i]:
+            resto -= lunghi[i]
+            i += 1
+        (x1, y1), (x2, y2) = linea[i], linea[i + 1]
+        t = resto / lunghi[i] if lunghi[i] else 0
+        angolo = math.degrees(math.atan2(y2 - y1, x2 - x1)) + (180 if al_contrario else 0)
+        angolo = (angolo + 180) % 360 - 180
+        out.append(f'<path class="freccia" transform="translate({x1 + (x2 - x1) * t:.1f},{y1 + (y2 - y1) * t:.1f}) rotate({angolo:.1f})" '
+                   f'd="M-6,0 L5,0 M1.5,-3.5 L5,0 L1.5,3.5" fill="none" stroke="#1d2125" stroke-opacity="0.6" stroke-width="1.8" '
+                   f'stroke-linecap="round" stroke-linejoin="round"/>')
+    return out
+
 def mappa(titolo, sit, numeri=(), sottotitolo=""):
-    W, H = 1000, 254 + 16 * len(numeri)
+    Y_TESTO = Y_GALLERIA + CORSIA + 56                            # prima riga di testo sotto la mappa
+    W, H = 1000, Y_TESTO + 24 + 16 * len(numeri)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
          f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
          f"<title>{titolo}</title>", f'<rect width="{W}" height="{H}" rx="8" fill="#ffffff"/>',
@@ -88,34 +120,37 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
 
     frecce = []                                                   # disegnate sopra tutte le corsie, alla fine
 
-    def corsie(punti, y, chiave_sud, chiave_nord):
+    def corsie(punti, y, chiave_sud, chiave_nord, classe="", frazioni=None, cavalcavia=False):
         for k, (senso, chiave) in enumerate((("NS", chiave_sud), ("SN", chiave_nord))):
             linea = _parallela(punti, k * CORSIA)
             pts = " ".join(f"{x:.1f},{yy:.1f}" for x, yy in linea)
-            o.append(f'<polyline points="{pts}" fill="none" stroke="{colore(sit.get(chiave))}" stroke-width="10" stroke-linejoin="round"/>')
-            frecce.extend(_frecce(linea, senso == "SN"))
+            attr = f' class="{classe}"' if classe else ""
+            if cavalcavia and senso == "SN":                      # bordo bianco: si vede che passa sopra la corsia «verso sud»
+                o.append(f'<polyline points="{pts}" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="round"/>')
+            o.append(f'<polyline{attr} points="{pts}" fill="none" stroke="{colore(sit.get(chiave))}" stroke-width="10" stroke-linejoin="round"/>')
+            frecce.extend(_frecce_a(linea, senso == "SN", frazioni) if frazioni else _frecce(linea, senso == "SN"))
 
-    # Rami: prima il passo (sotto), poi la strada principale e la galleria.
-    corsie([(X["Göschenen"], Y_GALLERIA), (X["Göschenen"] + 30, Y_PASSO), (X["Airolo"] - 30, Y_PASSO), (X["Airolo"], Y_GALLERIA)],
-           0, ("NS", "passo"), ("SN", "passo"))
+    # Prima la strada principale con la galleria, poi il ramo del passo sopra. Agli svincoli la corsia «verso nord»
+    # del passo scavalca la corsia «verso sud» per raggiungere la sua (cavalcavia). Una freccia per curva e una in quota.
     o.append(f'<rect x="{X["Göschenen"] + 20}" y="{Y_GALLERIA - 10}" width="{X["Airolo"] - X["Göschenen"] - 40}" height="{CORSIA + 20}" rx="6" fill="#3c4043"/>')
     for a, b, chiave in (("Erstfeld", "Amsteg", "esterni"), ("Amsteg", "Göschenen", "tunnel"), ("Göschenen", "Airolo", "tunnel"),
                          ("Airolo", "Faido", "tunnel"), ("Faido", "Biasca", "esterni")):
         corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave))
+    corsie(_ramo_passo(), 0, ("NS", "passo"), ("SN", "passo"), "corsia-passo", (0.19, 0.5, 0.81), cavalcavia=True)
     o.extend(frecce)
-    o.append(f'<text x="{(X["Göschenen"] + X["Airolo"]) / 2:.0f}" y="{Y_GALLERIA - 16}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Galleria 17 km</text>')
-    xp = RAMO_PASSO[2][1]
-    o.append(f'<path d="M{xp - 11},{Y_PASSO + CORSIA + 22} L{xp},{Y_PASSO + CORSIA + 8} L{xp + 11},{Y_PASSO + CORSIA + 22} Z" fill="#3c4043"/>')
-    o.append(f'<text x="{xp}" y="{Y_PASSO + CORSIA + 36}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Passo 2106 m</text>')
-    o.append(f'<text x="{RAMO_PASSO[1][1]}" y="{Y_PASSO + CORSIA + 22}" text-anchor="middle" fill="#5f6368" font-size="11">Andermatt</text>')
+    sotto_strada = Y_GALLERIA + CORSIA + 24                       # nomi sotto la strada principale: sopra c'è il passo
+    o.append(f'<text x="{(X["Göschenen"] + X["Airolo"]) / 2:.0f}" y="{sotto_strada}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Galleria 17 km</text>')
+    o.append(f'<path d="M{X_VETTA - 12},{Y_PASSO - 9} L{X_VETTA},{Y_PASSO - 24} L{X_VETTA + 12},{Y_PASSO - 9} Z" fill="#3c4043"/>')
+    o.append(f'<text x="{X_VETTA}" y="{Y_PASSO - 30}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Passo 2106 m</text>')
+    o.append(f'<text x="{X_ANDERMATT - 8}" y="{_y_ramo(X_ANDERMATT) - 12:.0f}" text-anchor="end" fill="#5f6368" font-size="11">Andermatt</text>')
     for n, x in X.items():
-        o.append(f'<line x1="{x}" y1="{Y_GALLERIA - 12}" x2="{x}" y2="{Y_GALLERIA + CORSIA + 6}" stroke="#ffffff" stroke-width="2"/>')
-        o.append(f'<text x="{x}" y="{Y_GALLERIA - 16 if n not in ("Göschenen", "Airolo") else Y_GALLERIA - 30}" text-anchor="middle" fill="#5f6368" font-size="11">{n}</text>')
+        o.append(f'<line x1="{x}" y1="{Y_GALLERIA - 6}" x2="{x}" y2="{Y_GALLERIA + CORSIA + 6}" stroke="#ffffff" stroke-width="2"/>')
+        o.append(f'<text x="{x}" y="{sotto_strada}" text-anchor="middle" fill="#5f6368" font-size="11">{n}</text>')
     o.append(f'<text x="96" y="{Y_GALLERIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">verso sud →</text>')
     o.append(f'<text x="96" y="{Y_GALLERIA + CORSIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">← verso nord</text>')
 
 
-    y = 232
+    y = Y_TESTO
     for riga in numeri:
         if riga.startswith("Adesso conviene"):                    # la risposta alla domanda «galleria o passo?» in evidenza
             o.append(f'<text x="16" y="{y}" fill="#202124" font-size="12" font-weight="600">{riga}</text>')
