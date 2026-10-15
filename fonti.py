@@ -9,7 +9,8 @@ def http(metodo, url, intestazioni=None, corpo=None):
     if dati:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        # Apify esegue l'attore durante la chiamata e lo addebita anche se noi smettiamo di aspettare: margine ampio.
+        with urllib.request.urlopen(req, timeout=300 if "api.apify.com" in url else 60) as r:
             testo = r.read()
             return r.status, (json.loads(testo) if testo else None)
     except urllib.error.HTTPError as e:
@@ -53,22 +54,25 @@ def componi(nome, origine, destinazione, percorso, tratte):
         return {**tratte[(origine, destinazione)], "misura": nome}
     return unisci(nome, tratte[(origine, VALICO)], tratte[(VALICO, destinazione)])
 
-def coppie_apple():
-    """Origine → destinazioni per le otto misure: 5 richieste a giro (l'API accetta fino a 10 destinazioni)."""
-    tratte = set()
+def richieste_apple():
+    """(origine, destinazioni) per le otto misure. Le tratte che toccano il valico vanno in richieste a sé:
+    col passo chiuso Apple potrebbe rifiutare l'intera richiesta, e si perderebbero anche le misure della galleria."""
+    tunnel, salite, discese = {}, set(), []
     for _, o, d, percorso in MISURE:
-        tratte |= {(o, d)} if percorso == "tunnel" else {(o, VALICO), (VALICO, d)}
-    per_origine = {}
-    for o, d in sorted(tratte):
-        per_origine.setdefault(o, []).append(d)
-    return per_origine
+        if percorso == "tunnel":
+            tunnel.setdefault(o, []).append(d)
+        else:
+            salite.add(o)
+            discese.append(d)
+    return ([(o, sorted(set(ds))) for o, ds in sorted(tunnel.items())] + [(o, [VALICO]) for o in sorted(salite)]
+            + [(VALICO, sorted(set(discese)))])
 
 def _vicino(a, b):
     return abs(a[0] - b[0]) < 0.01 and abs(a[1] - b[1]) < 0.01
 
 def apple(token, chiama=http):
     tratte = {}
-    for o, destinazioni in coppie_apple().items():
+    for o, destinazioni in richieste_apple():
         q = "origin=%s,%s&destinations=%s&transportType=Automobile" % (*PUNTI[o], "|".join("%s,%s" % PUNTI[d] for d in destinazioni))
         codice, r = chiama("GET", "https://maps-api.apple.com/v1/etas?" + q, {"Authorization": "Bearer " + token})
         for d in destinazioni:

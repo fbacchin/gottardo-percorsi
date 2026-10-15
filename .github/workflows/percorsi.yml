@@ -48,7 +48,7 @@ jobs:
           git -C privati config user.email "actions@users.noreply.github.com"
           # salva: commit e push del privato, con 3 tentativi dopo rebase (solo questo flusso scrive lì)
           salva() {
-            git -C privati add -A dati mappe storia README.md uso.json 2>/dev/null
+            git -C privati add -A dati mappe storia README.md uso.json 2>/dev/null || true
             git -C privati diff --cached --quiet && return 0
             git -C privati commit -q -m "percorsi $(date -u +%FT%TZ)"
             git -C privati push -q origin main && return 0
@@ -62,12 +62,25 @@ jobs:
           allinea() { sleep $(( 900 - $(date +%s) % 900 )); }
           # 11 giri: <= 15 min d'attesa iniziale + 10 x 15 min = 165 min < 178
           allinea
+          falliti=0
           for i in $(seq 1 11); do
-            git -C privati fetch -q origin main && git -C privati reset -q --hard origin/main
-            python3 giro.py || echo "giro fallito"
+            # Un commit non pubblicato al giro prima (push fallito) non si butta: si riallinea con rebase.
+            # Il reset duro solo quando non c'è niente di nostro da salvare.
+            git -C privati fetch -q origin main
+            if [ -z "$(git -C privati rev-list origin/main..HEAD)" ]; then
+              git -C privati reset -q --hard origin/main
+            else
+              git -C privati rebase -q origin/main || { git -C privati rebase --abort || true; echo "::warning::rebase non riuscito, riprovo al prossimo giro"; }
+            fi
+            if ! python3 giro.py; then
+              falliti=$((falliti + 1))
+              echo "::error::giro $i fallito"
+            fi
             salva
             if [ "$i" -lt 11 ]; then allinea; fi
           done
+          # Freno: con 3 o più giri falliti il run risulta fallito, così si vede e la catena non va avanti da sola.
+          if [ "$falliti" -ge 3 ]; then echo "::error::$falliti giri falliti su 11"; exit 1; fi
 
   next:
     needs: misura

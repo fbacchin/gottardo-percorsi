@@ -113,7 +113,10 @@ def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
 
     # Code segnalate da Waze, nel punto in cui sono: barra con bordo scuro sopra la corsia.
     for c in code_waze:
-        lat, lon = float(c["lat"]), float(c["lon"])
+        try:
+            lat, lon = float(c["lat"]), float(c["lon"])
+        except (TypeError, ValueError):
+            continue                                              # coda senza coordinate: non si sa dove disegnarla
         sul_passo = lon < 8.60 and 46.535 < lat < 46.66
         x = _x_da_lat(lat, RAMO_PASSO if sul_passo else [(la, X[n]) for n, la in LAT])
         if x is None:

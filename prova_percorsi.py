@@ -81,9 +81,9 @@ def prova_pem_su_una_riga():
     assert pem(completo) == completo and pem(completo.replace("\n", " ")) == completo
 
 def prova_apple_coppie():
-    from fonti import coppie_apple
-    c = coppie_apple()
-    assert len(c) == 5 and sum(len(v) for v in c.values()) == 12 and all(len(v) <= 10 for v in c.values())
+    from fonti import richieste_apple
+    r = richieste_apple()
+    assert len(r) == 9 and sum(len(d) for _, d in r) == 12 and all(len(d) <= 10 for _, d in r)
 
 def prova_apple_campione():
     from fonti import apple
@@ -324,6 +324,47 @@ def prova_riferimenti():
     assert controlla_distanza(risultato("SN Biasca-Erstfeld tunnel", 4553, 4434, 90948))["esito"] == "percorso diverso"
     assert controlla_distanza(risultato("NS Erstfeld-Biasca passo", 5363, 5245, 105999))["esito"] == "percorso diverso"
     assert controlla_distanza(risultato("NS Erstfeld-Biasca tunnel", 2928, 2914, 75536))["esito"] == "ok"
+
+def prova_apple_valico_in_richieste_separate():
+    """Revisione: col passo chiuso Apple potrebbe rifiutare tutta la richiesta; il valico non va mescolato alle altre destinazioni."""
+    from fonti import apple, richieste_apple
+    from config import VALICO, MISURE
+    for origine, destinazioni in richieste_apple():
+        assert VALICO not in destinazioni or destinazioni == [VALICO] or origine == VALICO
+    c = _campione("privati/campioni/apple-etas.json")["risposta"]["etas"][0]      # Erstfeld→Biasca
+    def chiama(metodo, url, intestazioni=None, corpo=None):
+        if "46.5588,8.5621" in url: return 400, {"error": "no route"}           # tutto ciò che tocca il valico
+        n = url.split("destinations=")[1].split("&")[0].count("|") + 1
+        return 200, {"etas": [{**c, "destination": {"latitude": float(d.split(",")[0]), "longitude": float(d.split(",")[1])}}
+                              for d in url.split("destinations=")[1].split("&")[0].split("|")]}
+    rs = {r["misura"]: r for r in apple("t", chiama)}
+    assert all(rs[m[0]]["esito"] == "ok" for m in MISURE if m[3] == "tunnel")
+    assert all(rs[m[0]]["esito"] == "errore 400" for m in MISURE if m[3] == "passo")
+
+def prova_giro_errore_a_meta_conta_le_quote():
+    """Revisione: un'eccezione dopo registra() non deve far perdere il conteggio né fermare le altre fonti."""
+    from config import ZURIGO
+    import fonti
+    d = tempfile.mkdtemp()
+    vero = fonti.da_google
+    from config import RIFERIMENTI_M
+    fonti.da_google = lambda nome, codice, r: {"misura": nome, "con_traffico_s": None, "senza_traffico_s": 1,
+                                               "distanza_m": RIFERIMENTI_M[nome], "esito": "ok"}   # ok ma senza tempo: TypeError più avanti
+    try:
+        _, priv, uscita = _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), lambda *a, **k: (503, None),
+                                      {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"}, d)
+    finally:
+        fonti.da_google = vero
+    uso = json.load(open(f"{priv}/uso.json"))
+    assert uso["google"]["2026-10"] == 8 and uso["openwebninja"]["2026-10"] == 1   # contato, e Waze è andato avanti
+    assert "google errore TypeError" in uscita and os.path.exists(f"{priv}/README.md")
+
+def prova_waze_coda_senza_coordinate():
+    from pagina import mappa_fonte
+    from config import ZURIGO
+    q = datetime(2026, 10, 18, 15, 15, tzinfo=ZURIGO)
+    svg = mappa_fonte("openwebninja", q, code_waze=[{"strada": "A2", "lat": "", "lon": "", "lunghezza_m": "300", "livello": "3"}])
+    assert svg.rstrip().endswith("</svg>")                                       # si salta, non si blocca la pagina
 
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
