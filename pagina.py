@@ -58,6 +58,24 @@ def _parallela(punti, d):
         out.append((x + nx * scala, y + ny * scala))
     return out
 
+def _frecce(linea, al_contrario, passo=70):
+    """Frecce (›) dentro la corsia nel senso di marcia: almeno una per tratto, così si leggono anche le diagonali degli svincoli."""
+    import math
+    out = []
+    for (x1, y1), (x2, y2) in zip(linea, linea[1:]):
+        lungo = math.hypot(x2 - x1, y2 - y1)
+        if lungo < 12:
+            continue
+        angolo = math.degrees(math.atan2(y2 - y1, x2 - x1)) + (180 if al_contrario else 0)
+        angolo = (angolo + 180) % 360 - 180
+        n = max(1, int(lungo // passo))
+        for i in range(n):
+            t = (i + 0.5) / n
+            out.append(f'<path class="freccia" transform="translate({x1 + (x2 - x1) * t:.1f},{y1 + (y2 - y1) * t:.1f}) rotate({angolo:.1f})" '
+                       f'd="M-3,-3.5 L1.5,0 L-3,3.5" fill="none" stroke="#1d2125" stroke-opacity="0.6" stroke-width="1.8" '
+                       f'stroke-linecap="round" stroke-linejoin="round"/>')
+    return out
+
 def mappa(titolo, sit, numeri=(), sottotitolo=""):
     W, H = 1000, 250 + 16 * len(numeri)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
@@ -68,10 +86,14 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
         o.append(f'<text x="16" y="44" fill="#5f6368" font-size="11">{sottotitolo}</text>')
     colore = lambda v: COLORI[pallino("" if v is None else v)]
 
+    frecce = []                                                   # disegnate sopra tutte le corsie, alla fine
+
     def corsie(punti, y, chiave_sud, chiave_nord):
         for k, (senso, chiave) in enumerate((("NS", chiave_sud), ("SN", chiave_nord))):
-            pts = " ".join(f"{x:.1f},{yy:.1f}" for x, yy in _parallela(punti, k * CORSIA))
+            linea = _parallela(punti, k * CORSIA)
+            pts = " ".join(f"{x:.1f},{yy:.1f}" for x, yy in linea)
             o.append(f'<polyline points="{pts}" fill="none" stroke="{colore(sit.get(chiave))}" stroke-width="10" stroke-linejoin="round"/>')
+            frecce.extend(_frecce(linea, senso == "SN"))
 
     # Rami: prima il passo (sotto), poi la strada principale e la galleria.
     corsie([(X["Göschenen"], Y_GALLERIA), (X["Göschenen"] + 30, Y_PASSO), (X["Airolo"] - 30, Y_PASSO), (X["Airolo"], Y_GALLERIA)],
@@ -80,6 +102,7 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
     for a, b, chiave in (("Erstfeld", "Amsteg", "esterni"), ("Amsteg", "Göschenen", "tunnel"), ("Göschenen", "Airolo", "tunnel"),
                          ("Airolo", "Faido", "tunnel"), ("Faido", "Biasca", "esterni")):
         corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave))
+    o.extend(frecce)
     o.append(f'<text x="{(X["Göschenen"] + X["Airolo"]) / 2:.0f}" y="{Y_GALLERIA - 16}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Galleria 17 km</text>')
     xp = RAMO_PASSO[2][1]
     o.append(f'<path d="M{xp - 11},{Y_PASSO + CORSIA + 22} L{xp},{Y_PASSO + CORSIA + 8} L{xp + 11},{Y_PASSO + CORSIA + 22} Z" fill="#3c4043"/>')
