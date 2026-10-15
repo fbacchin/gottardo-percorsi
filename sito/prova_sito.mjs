@@ -11,4 +11,6 @@ assert.deepEqual(m.map((x) => x.quando), ["2026-10-15 18:00", "2026-10-15 17:45"
 assert.deepEqual(m[0].file, { apple: "2026-10-15-1800-apple.svg", tomtom: "2026-10-15-1800-tomtom.svg" });
 
 assert.deepEqual([0, 1, 3, 4, 6, 11].map(quanto), ["adesso", "15 minuti fa", "45 minuti fa", "1 h fa", "1 h 30 min fa", "2 h 45 min fa"]);
+import { FONTI } from "./logica.mjs";
+assert.deepEqual(FONTI.map(([f]) => f), ["apple", "tomtom", "google"]);   // Waze tolto dal pannello
 console.log("prove della pagina: ok");

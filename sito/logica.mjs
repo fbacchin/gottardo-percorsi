@@ -1,10 +1,9 @@
 // Logica pura della pagina, condivisa dal Worker e dalle prove (node sito/prova_sito.mjs).
 
 export const FONTI = [
-  ["apple", "Apple Maps"], ["tomtom", "TomTom"], ["google", "Google"],
-  ["openwebninja", "Waze (OpenWeb Ninja)"], ["apify", "Waze (Apify)"],
+  ["apple", "Apple Maps"], ["tomtom", "TomTom"], ["google", "Google"],   // Waze tolto dal pannello (15.10): solo dati nei CSV
 ];
-const NOME_MAPPA = /^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})-(apple|tomtom|google|openwebninja|apify)\.svg$/;
+const NOME_MAPPA = /^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})-(apple|tomtom|google)\.svg$/;
 
 // Solo nomi di mappa validi: niente percorsi arbitrari verso il repository.
 export function mappaValida(nome) {

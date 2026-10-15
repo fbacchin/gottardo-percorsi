@@ -177,15 +177,6 @@ def prova_situazione():
     assert s[("NS", "tunnel")] is None and s[("NS", "esterni")] is None       # manca il centro: niente differenza inventata
     assert situazione({}) == {k: None for k in s}                               # fonte assente: tutto grigio
 
-def prova_waze_posizione_e_senso():
-    from pagina import _senso_waze, _x_da_lat, X, LAT, RAMO_PASSO
-    assert _senso_waze("A2 > Zürich / Luzern / San Gottardo") == "SN" and _senso_waze("A2 > Chiasso / Lugano") == "NS"
-    assert _senso_waze("Via Cantonale") is None
-    corridoio = [(la, X[n]) for n, la in LAT]
-    assert _x_da_lat(46.672, corridoio) == X["Göschenen"] and X["Göschenen"] < _x_da_lat(46.60, corridoio) < X["Airolo"]
-    assert _x_da_lat(47.10, corridoio) is None                                  # fuori dalla strada: non si disegna
-    assert _x_da_lat(46.5588, RAMO_PASSO) == RAMO_PASSO[2][1]
-
 def prova_corsie_parallele():
     from pagina import _parallela
     assert _parallela([(0, 0), (10, 0)], 14) == [(0, 14), (10, 14)]
@@ -200,21 +191,14 @@ def prova_mappe_per_fonte():
     assert "Google — 15:15" in svg and "misura delle 2026-10-18 15:00" in svg and "+12 min · totale 64 min" in svg and "#ff6f00" in svg
     assert "misura delle" not in mappa_fonte("apple", q, riga, ora_misura="2026-10-18 15:15")
     assert "nessun dato in questo quarto d'ora" in mappa_fonte("tomtom", q)
-    coda = {"strada": "A2 > Zürich", "citta": "Airolo", "lat": 46.50, "lon": 8.66, "lunghezza_m": 2100, "livello": 4, "velocita_kmh": "8.4"}
-    chiusa = {"strada": "A2 - E35", "citta": "Airolo", "lat": 46.5267, "lon": 8.6149, "lunghezza_m": 274, "livello": 5, "sottotipo": "ROAD_CLOSED"}
-    w = mappa_fonte("apify", q, code_waze=[chiusa, coda])
-    assert "2 code segnalate da Waze" in w and "#c62828" in w
-    assert "Airolo, verso nord: coda 2,1 km a 8 km/h" in w                     # elenco leggibile, la più lunga prima
-    assert "Airolo, senso non indicato: chiusura 0,3 km" in w
-    import re
-    assert all(int(x) >= 18 for x in re.findall(r'<rect x="[0-9.-]+" y="[0-9.-]+" width="([0-9]+)" height="16"', w))   # visibili anche sul telefono
-    assert "nessuna coda segnalata da Waze" in mappa_fonte("openwebninja", q, code_waze=[])
+    from pagina import FONTI_MAPPA
+    assert [f for f, _ in FONTI_MAPPA] == ["apple", "tomtom", "google"]            # Waze tolto dal pannello (richiesta dell'utente, 15.10)
 
 def prova_pagine_e_link():
     from pagina import pagine, nome_mappa, PASSI_STORIA
     from config import ZURIGO
     adesso = datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO)
-    p = pagine(adesso, lambda m: "-apify" not in m)                              # mappe Apify mancanti
+    p = pagine(adesso, lambda m: "-google" not in m)                             # mappe Google mancanti
     assert set(p) == {"README.md"} | {f"storia/{15 * k}.md" for k in range(1, PASSI_STORIA)}
     assert "[◀ 15 minuti prima](storia/15.md)" in p["README.md"] and "15 minuti dopo" not in p["README.md"]
     assert f"![Apple Maps]({nome_mappa(adesso, 'apple')})" in p["README.md"]
@@ -280,8 +264,8 @@ def prova_giro_orarie_tra_un_ora_e_l_altra():
     _, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 15, tzinfo=ZURIGO), risposte, env, d)
     g = open(f"{priv}/mappe/2026-10-16-1815-google.svg", encoding="utf-8").read()
     assert "misura delle 2026-10-16 18:00" in g and "totale" in g
-    o = open(f"{priv}/mappe/2026-10-16-1815-openwebninja.svg", encoding="utf-8").read()
-    assert "misura delle 2026-10-16 18:00" in o and "Waze" in o
+    assert not glob.glob(f"{priv}/mappe/*-openwebninja.svg")                    # Waze: solo dati, nessuna mappa
+    assert "2026-10-16 18:00,coda" in open(f"{priv}/dati/waze-openwebninja-2026-10.csv", encoding="utf-8").read()
     assert json.load(open(f"{priv}/uso.json"))["google"]["2026-10"] == 8   # alle :15 Google non è stato chiamato
 
 def prova_giro_cancella_mappe_vecchie():
@@ -363,13 +347,6 @@ def prova_giro_errore_a_meta_conta_le_quote():
     uso = json.load(open(f"{priv}/uso.json"))
     assert uso["google"]["2026-10"] == 8 and uso["openwebninja"]["2026-10"] == 1   # contato, e Waze è andato avanti
     assert "google errore TypeError" in uscita and os.path.exists(f"{priv}/README.md")
-
-def prova_waze_coda_senza_coordinate():
-    from pagina import mappa_fonte
-    from config import ZURIGO
-    q = datetime(2026, 10, 18, 15, 15, tzinfo=ZURIGO)
-    svg = mappa_fonte("openwebninja", q, code_waze=[{"strada": "A2", "lat": "", "lon": "", "lunghezza_m": "300", "livello": "3"}])
-    assert svg.rstrip().endswith("</svg>")                                       # si salta, non si blocca la pagina
 
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]

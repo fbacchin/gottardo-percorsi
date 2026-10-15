@@ -17,10 +17,8 @@ def pallino(v):
 # tra Göschenen e Airolo due rami: galleria (in alto) e passo (in basso).
 
 X = {"Erstfeld": 110, "Amsteg": 230, "Göschenen": 370, "Airolo": 680, "Faido": 820, "Biasca": 950}
-LAT = [("Erstfeld", 46.834), ("Amsteg", 46.772), ("Göschenen", 46.672), ("Airolo", 46.527), ("Faido", 46.466), ("Biasca", 46.355)]
 RAMO_PASSO = [(46.672, 370), (46.636, 440), (46.5588, 520), (46.527, 680)]   # Göschenen, Andermatt, Passo, Airolo
 Y_GALLERIA, Y_PASSO, CORSIA = 78, 158, 14            # y della corsia «verso sud»; quella «verso nord» è CORSIA più in basso
-LIVELLO_WAZE = {1: "🟡", 2: "🟡", 3: "🟠", 4: "🔴", 5: "🔴"}
 
 def _nome(senso, tratta, percorso):
     lunga = {"NS": "NS Erstfeld-Biasca", "SN": "SN Biasca-Erstfeld"}
@@ -43,23 +41,6 @@ def situazione(righe_per_fonte, fonte_colore="apple"):
         s[(senso, "esterni")] = None if lunga is None or corta is None else lunga - corta
     return s
 
-def _x_da_lat(lat, punti):
-    """Posizione orizzontale sullo schema per interpolazione sulle latitudini (la strada corre da nord a sud)."""
-    for (la1, x1), (la2, x2) in zip(punti, punti[1:]):
-        if la1 >= lat >= la2:
-            return x1 + (x2 - x1) * (la1 - lat) / (la1 - la2)
-    return None
-
-def _senso_waze(strada):
-    """Il senso si legge dalla destinazione nel nome della strada («A2 > Zürich / Luzern …» = verso nord)."""
-    # ponytail: euristica sul testo di Waze; se non c'è una destinazione nota la coda va su entrambe le corsie
-    s = (strada or "").lower()
-    if any(n in s for n in ("zürich", "zurich", "luzern", "basel", "altdorf")):
-        return "SN"
-    if any(n in s for n in ("chiasso", "lugano", "bellinzona", "milano", "biasca")):
-        return "NS"
-    return None
-
 def _parallela(punti, d):
     """La stessa linea spostata di d a destra del verso di percorrenza (giunti ad angolo), per affiancare le corsie."""
     import math
@@ -77,7 +58,7 @@ def _parallela(punti, d):
         out.append((x + nx * scala, y + ny * scala))
     return out
 
-def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
+def mappa(titolo, sit, numeri=(), sottotitolo=""):
     W, H = 1000, 250 + 16 * len(numeri)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
          f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
@@ -85,8 +66,7 @@ def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
          f'<text x="16" y="26" fill="#202124" font-size="15" font-weight="700">{titolo}</text>']
     if sottotitolo:
         o.append(f'<text x="16" y="44" fill="#5f6368" font-size="11">{sottotitolo}</text>')
-    colore = (lambda v: "#e3e5e8") if sit is None else (lambda v: COLORI[pallino("" if v is None else v)])
-    sit = sit or {}
+    colore = lambda v: COLORI[pallino("" if v is None else v)]
 
     def corsie(punti, y, chiave_sud, chiave_nord):
         for k, (senso, chiave) in enumerate((("NS", chiave_sud), ("SN", chiave_nord))):
@@ -111,24 +91,6 @@ def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
     o.append(f'<text x="96" y="{Y_GALLERIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">verso sud →</text>')
     o.append(f'<text x="96" y="{Y_GALLERIA + CORSIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">← verso nord</text>')
 
-    # Code segnalate da Waze, nel punto in cui sono: barra con bordo scuro sopra la corsia.
-    for c in code_waze:
-        try:
-            lat, lon = float(c["lat"]), float(c["lon"])
-        except (TypeError, ValueError):
-            continue                                              # coda senza coordinate: non si sa dove disegnarla
-        sul_passo = lon < 8.60 and 46.535 < lat < 46.66
-        x = _x_da_lat(lat, RAMO_PASSO if sul_passo else [(la, X[n]) for n, la in LAT])
-        if x is None:
-            continue
-        y0 = Y_PASSO if sul_passo else Y_GALLERIA
-        # Alla scala della mappa (~11,6 punti per km) una coda di 1-2 km sarebbe invisibile sul telefono: larghezza minima 18.
-        largo = max(18, float(c.get("lunghezza_m") or 0) / 1000 * 11.6)
-        sensi = [_senso_waze(c.get("strada"))] if _senso_waze(c.get("strada")) else ["NS", "SN"]
-        for senso in sensi:
-            y = y0 + (CORSIA if senso == "SN" else 0)
-            o.append(f'<rect x="{x - largo / 2:.0f}" y="{y - 8}" width="{largo:.0f}" height="16" rx="4" '
-                     f'fill="{COLORI[LIVELLO_WAZE.get(int(c.get("livello") or 3), "🟠")]}" stroke="#202124" stroke-width="2"/>')
 
     y = 232
     for riga in numeri:
@@ -147,8 +109,7 @@ def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
 # Pagine: il README mostra l'ultimo rilievo, una mappa per fonte; «◀ 15 minuti prima» porta alle pagine precedenti.
 # Ogni mappa ha l'orario nel nome e non cambia più: a ogni giro si aggiungono solo le mappe nuove.
 
-FONTI_MAPPA = (("apple", "Apple Maps"), ("tomtom", "TomTom"), ("google", "Google"),
-               ("openwebninja", "Waze (OpenWeb Ninja)"), ("apify", "Waze (Apify)"))
+FONTI_MAPPA = (("apple", "Apple Maps"), ("tomtom", "TomTom"), ("google", "Google"))   # Waze tolto dal pannello (15.10): solo dati nei CSV
 PASSI_STORIA = 12                      # 3 ore di quarti d'ora
 
 def nome_mappa(quando, fonte):
@@ -166,38 +127,13 @@ def numeri_fonte(riga, totali):
         out.append(f"Erstfeld–Biasca {testo}: " + "   |   ".join(parti))
     return out
 
-def elenco_waze(code, massimo=8):
-    """Una riga per coda, la più lunga prima: «Airolo, verso nord: coda 2,1 km a 8 km/h»."""
-    def km(c):
-        try:
-            return float(c.get("lunghezza_m") or 0)
-        except ValueError:
-            return 0.0
-    righe = []
-    for c in sorted(code, key=km, reverse=True)[:massimo]:
-        senso = {"NS": "verso sud", "SN": "verso nord"}.get(_senso_waze(c.get("strada")), "senso non indicato")
-        luogo = c.get("citta") or c.get("strada") or "luogo non indicato"
-        cosa = "chiusura" if "CLOSED" in str(c.get("sottotipo") or "") else "coda"
-        riga = f"{luogo}, {senso}: {cosa} {km(c) / 1000:.1f} km".replace(".", ",")
-        try:
-            if cosa == "coda" and c.get("velocita_kmh") not in (None, ""):
-                riga += f" a {round(float(c['velocita_kmh']))} km/h"
-        except ValueError:
-            pass
-        righe.append(riga)
-    return righe
-
-def mappa_fonte(fonte, quando, riga=None, totali=None, code_waze=None, ora_misura=None):
+def mappa_fonte(fonte, quando, riga=None, totali=None, ora_misura=None):
     etichetta = dict(FONTI_MAPPA)[fonte]
     titolo = f"{etichetta} — {quando:%H:%M}"
     sotto = f"misura delle {ora_misura}" if ora_misura and ora_misura != f"{quando:%Y-%m-%d %H:%M}" else ""
-    if code_waze is not None:
-        n = len(code_waze)
-        titolo_elenco = "nessuna coda segnalata da Waze" if n == 0 else "1 coda segnalata da Waze:" if n == 1 else f"{n} code segnalate da Waze:"
-        return mappa(titolo, None, code_waze, [titolo_elenco] + elenco_waze(code_waze), sotto)
     if riga is None:
-        return mappa(titolo, {}, (), ["nessun dato in questo quarto d'ora"], sotto)
-    return mappa(titolo, situazione({fonte: riga}, fonte), (), numeri_fonte(riga, totali), sotto)
+        return mappa(titolo, {}, ["nessun dato in questo quarto d'ora"], sotto)
+    return mappa(titolo, situazione({fonte: riga}, fonte), numeri_fonte(riga, totali), sotto)
 
 def pagine(adesso, esiste):
     """{percorso: testo markdown} per il README e le pagine storia/<minuti>.md; esiste(percorso) dice se una mappa c'è."""
@@ -214,7 +150,7 @@ def pagine(adesso, esiste):
             link.append(f"[15 minuti dopo ▶]({'../README.md' if k == 1 else f'{15 * (k - 1)}.md'})")
         righe = [f"# Gottardo — traffico alle {quando:%H:%M}", "", f"**{quando:%d.%m.%Y %H:%M}** (ora svizzera, {quanto})", "",
                  " · ".join(link), "",
-                 " · ".join(f"{p} {t}" for p, t in LEGENDA[:4]) + " · le barre con bordo nero sono code segnalate da Waze", ""]
+                 " · ".join(f"{p} {t}" for p, t in LEGENDA[:4]), ""]
         for fonte, etichetta in FONTI_MAPPA:
             m = nome_mappa(quando, fonte)
             righe += [f"### {etichetta}", "", f"![{etichetta}]({su}{m})" if esiste(m) else "_nessuna mappa per questo quarto d'ora_", ""]

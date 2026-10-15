@@ -76,7 +76,7 @@ const PAGINA = `<!doctype html>
   </nav>
 </div></header>
 <main id="mappe"></main>
-<p class="nota">Una mappa per fonte. Corsia in alto verso sud, in basso verso nord; tra Göschenen e Airolo la galleria (sopra) e il passo (sotto). Le barre con bordo nero sono code segnalate da Waze. Google e Waze misurano una volta all'ora. La pagina si aggiorna da sola quando arriva un rilievo nuovo.</p>
+<p class="nota">Una mappa per fonte. Corsia in alto verso sud, in basso verso nord; tra Göschenen e Airolo la galleria (sopra) e il passo (sotto). Google misura una volta all'ora. La pagina si aggiorna da sola quando arriva un rilievo nuovo.</p>
 <script>
   let fonti = [], momenti = [], i = 0;
   const el = (id) => document.getElementById(id);

@@ -105,34 +105,9 @@ def giro(adesso, env, pubblico, privato, chiama=fonti.http):
             _scrivi(privato, nome_mappa(quarto, fonte), svg)
         except Exception as e:
             print("mappa", fonte, "errore", type(e).__name__)
-    for fonte in ("openwebninja", "apify"):
-        if not attiva(fonte):
-            continue
-        try:
-            righe, ora_misura = _ultime_waze(privato, fonte, quarto, un_ora_fa)
-            svg = (mappa_fonte(fonte, quarto, code_waze=[r for r in righe if r["tipo"] == "coda"], ora_misura=ora_misura)
-                   if ora_misura else mappa_fonte(fonte, quarto))
-            _scrivi(privato, nome_mappa(quarto, fonte), svg)
-        except Exception as e:
-            print("mappa", fonte, "errore", type(e).__name__)
-
     _togli_mappe_vecchie(privato, quarto)
     for percorso, testo in pagine(quarto, lambda m: os.path.exists(os.path.join(privato, m))).items():
         _scrivi(privato, percorso, testo)
-
-def _ultime_waze(privato, fonte, quarto, un_ora_fa):
-    """Righe dell'ultimo rilevamento Waze dell'ultima ora (con la sua ora), oppure ([], None)."""
-    p = file_mese(os.path.join(privato, "dati"), f"waze-{fonte}", quarto)
-    if not os.path.exists(p):
-        return [], None
-    with open(p, newline="", encoding="utf-8") as f:
-        tutte = list(csv.DictReader(f))
-    if not tutte or tutte[0]["ora"] <= un_ora_fa:
-        return [], None
-    ultima = tutte[0]["ora"]
-    if tutte[0]["tipo"] not in ("coda", "segnalazione", "nessuna coda"):
-        return [], None                                               # l'ultimo rilevamento è fallito
-    return [r for r in tutte if r["ora"] == ultima], ultima
 
 def _togli_mappe_vecchie(privato, quarto):
     """Le pagine arrivano a 3 ore fa: le mappe più vecchie non servono più."""
