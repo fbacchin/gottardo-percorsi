@@ -131,6 +131,23 @@ def prova_google_otto_misure():
     rs = google("k", lambda *a, **k: (500, None))
     assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
 
+def prova_waze_campioni():
+    from fonti import righe_openwebninja, riga_apify, CAMPI_WAZE
+    o = _campione("privati/campioni/openwebninja.json")["risposta"]
+    a = _campione("privati/campioni/apify.json")["risposta"]
+    for righe in (righe_openwebninja(o), [riga_apify(x) for x in a]):
+        assert righe, "nessuna riga: area vuota o nomi dei campi sbagliati"
+        assert all(set(r) == set(CAMPI_WAZE) for r in righe)
+        assert all(r["tipo"] in ("coda", "segnalazione") for r in righe)
+        assert all(isinstance(r["lat"], (int, float)) and 46.3 < r["lat"] < 46.9 for r in righe)   # dentro l'area
+        code = [r for r in righe if r["tipo"] == "coda"]
+        assert code and all(r["lunghezza_m"] is not None and r["id"] for r in code)
+
+def prova_waze_errori():
+    from fonti import waze_openwebninja, waze_apify
+    assert waze_openwebninja("k", lambda *a, **k: (429, None)) == (None, "errore 429")
+    assert waze_apify("k", lambda *a, **k: (402, {"error": "x"})) == (None, "errore 402")
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
