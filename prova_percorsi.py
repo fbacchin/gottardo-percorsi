@@ -299,6 +299,20 @@ def prova_giro_quota_esaurita():
     assert not chiamate                                                        # nessuna richiesta oltre il tetto
     assert "quota esaurita" in open(f"{priv}/dati/google-2026-10.csv", encoding="utf-8").read()
 
+def prova_tomtom_429_si_riprova():
+    """15.10.2026: 8 richieste di fila → le ultime 3 con 429 (troppe al secondo per il piano gratuito)."""
+    from fonti import tomtom
+    c = _campione("privati/campioni/tomtom-tunnel.json")
+    chiamate, pause = [], []
+    def chiama(metodo, url, intestazioni=None, corpo=None):
+        chiamate.append(url)
+        return (429, None) if len(chiamate) in (5, 6) else (c["codice"], c["risposta"])
+    rs = tomtom("k", chiama, attesa=pause.append)
+    assert all(r["esito"] == "ok" for r in rs) and len(chiamate) == 10       # due 429 riprovati
+    assert pause and all(p > 0 for p in pause)
+    sempre = tomtom("k", lambda *a, **k: (429, None), attesa=lambda s: None)
+    assert all(r["esito"] == "errore 429" for r in sempre)                 # dopo i tentativi si arrende, senza inventare
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

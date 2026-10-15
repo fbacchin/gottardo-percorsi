@@ -92,13 +92,19 @@ def da_tomtom(nome, codice, r):
         return risultato(nome, esito="percorso non trovato")
     return risultato(nome, esito=f"errore {codice}")
 
-def tomtom(chiave, chiama=http):
-    """Una richiesta per misura; il passo con il punto del valico come tappa."""
+def tomtom(chiave, chiama=http, attesa=time.sleep):
+    """Una richiesta per misura; il passo con il punto del valico come tappa.
+    Il piano gratuito rifiuta con 429 le richieste troppo ravvicinate (15.10.2026: le ultime 3 di 8):
+    si lascia una pausa tra le richieste e dopo un 429 si riprova, al massimo due volte."""
     out = []
     for nome, o, d, percorso in MISURE:
         tappe = [o, VALICO, d] if percorso == "passo" else [o, d]
-        codice, r = chiama("GET", f"https://api.tomtom.com/routing/1/calculateRoute/{_luogo(tappe)}/json"
-                                  f"?traffic=true&computeTravelTimeFor=all&travelMode=car&key={chiave}")
+        for tentativo in range(3):
+            attesa(0.3 if tentativo == 0 else 1.5)
+            codice, r = chiama("GET", f"https://api.tomtom.com/routing/1/calculateRoute/{_luogo(tappe)}/json"
+                                      f"?traffic=true&computeTravelTimeFor=all&travelMode=car&key={chiave}")
+            if codice != 429:
+                break
         out.append(da_tomtom(nome, codice, r))
     return out
 
