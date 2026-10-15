@@ -1,41 +1,6 @@
-# README e grafico: si devono capire al volo, anche dall'app GitHub sul telefono.
+# Mappe e pagine: si devono capire al volo, anche dall'app GitHub sul telefono.
 from datetime import datetime, timedelta
 from config import COLORI, MISURE, SOGLIE, ZURIGO
-
-ORARIE_SLOT = {"google": 4}   # una misura all'ora copre quattro quarti d'ora nel grafico
-# Località da nord a sud; «*» è il tratto Göschenen–Airolo, che cambia col percorso.
-STRADA = ["Erstfeld", "Amsteg", "Göschenen", "*", "Airolo", "Faido", "Biasca"]
-VALICO_TAPPE = {"tunnel": ["Galleria"], "passo": ["Andermatt", "Passo"]}
-
-def tappe(origine, destinazione, percorso):
-    """Località attraversate, nel senso di marcia, con la galleria o il passo in mezzo."""
-    strada = []
-    for n in STRADA:
-        strada += VALICO_TAPPE[percorso] if n == "*" else [n]
-    i, j = strada.index(origine), strada.index(destinazione)
-    return strada[i:j + 1] if i < j else strada[j:i + 1][::-1]
-
-def _percorso(o, d, percorso, x0, x1, y):
-    """Schema del percorso: località come punti su una riga; la galleria è un tratto scuro, il passo una vetta."""
-    nomi = tappe(o, d, percorso)
-    passo_x = (x1 - x0) / (len(nomi) - 1)
-    xs = [x0 + k * passo_x for k in range(len(nomi))]
-    out = []
-    for k in range(len(nomi) - 1):
-        galleria = "Galleria" in (nomi[k], nomi[k + 1])
-        out.append(f'<line x1="{xs[k]:.0f}" y1="{y}" x2="{xs[k + 1]:.0f}" y2="{y}" stroke="{"#3c4043" if galleria else "#bdc1c6"}" '
-                   f'stroke-width="{6 if galleria else 2}" stroke-linecap="round"/>')
-    for k, (n, x) in enumerate(zip(nomi, xs)):
-        ancora = "start" if k == 0 else "end" if k == len(nomi) - 1 else "middle"
-        if n == "Galleria":
-            out.append(f'<text x="{x:.0f}" y="{y - 7}" text-anchor="middle" fill="#202124" font-size="10" font-weight="600">Galleria 17 km</text>')
-        elif n == "Passo":
-            out.append(f'<path d="M{x - 9:.0f},{y + 1} L{x:.0f},{y - 10} L{x + 9:.0f},{y + 1} Z" fill="#3c4043"/>')
-            out.append(f'<text x="{x:.0f}" y="{y - 13}" text-anchor="middle" fill="#202124" font-size="10" font-weight="600">Passo 2106 m</text>')
-        else:
-            out.append(f'<circle cx="{x:.0f}" cy="{y}" r="3.5" fill="#ffffff" stroke="#5f6368" stroke-width="1.5"/>')
-            out.append(f'<text x="{x:.0f}" y="{y - 7}" text-anchor="{ancora}" fill="#5f6368" font-size="10">{n}</text>')
-    return out
 
 LEGENDA = (("🟢", "meno di 1 min"), ("🟡", "meno di 10"), ("🟠", "meno di 40"), ("🔴", "40 o più"), ("⚪", "nessun dato"))
 
@@ -47,86 +12,188 @@ def pallino(v):
             return simbolo
     return "🔴"
 
-def _cella(v, totale=None):
-    if v is None or v == "":
-        return "⚪ —"
-    return f"{pallino(v)} {'+' if int(v) > 0 else ''}{int(v)}" + (f" · {totale} min" if totale is not None else "")
+# ---------------------------------------------------------------------------------------------
+# Mappa della strada: dove c'è traffico in un dato momento. Una corsia per senso di marcia,
+# tra Göschenen e Airolo due rami: galleria (in alto) e passo (in basso).
 
-def readme(serie, fonti, ora, extra="", totali=None):
-    ultime = {f: (serie.get(f) or [{}])[0] for f in fonti}
-    righe = ["# Gottardo — tempi di percorrenza", "",
-             f"Aggiornato alle **{ora}** (ora svizzera). Per ogni percorso: ritardo in minuti rispetto alla strada libera · tempo totale di percorrenza.", "",
-             "## Adesso", "",
-             "| Misura | " + " | ".join(fonti) + " |",
-             "|---|" + "---|" * len(fonti)]
-    for nome, *_ in MISURE:
-        righe.append(f"| {nome} | " + " | ".join(_cella(ultime[f].get(nome), (totali or {}).get(f, {}).get(nome)) for f in fonti) + " |")
-    righe += ["", " · ".join(f"{p} {t}" for p, t in LEGENDA) + " (il motivo è nella colonna «esito» del CSV)", "",
-              "## Ultime 24 ore", "", "![Ultime 24 ore](grafico.svg)", ""]
-    if extra:
-        righe += [extra, ""]
-    righe += ["I dati completi sono nella cartella `dati/`, un file per fonte e per mese, righe più recenti in cima.", ""]
-    return "\n".join(righe)
+X = {"Erstfeld": 110, "Amsteg": 230, "Göschenen": 370, "Airolo": 680, "Faido": 820, "Biasca": 950}
+LAT = [("Erstfeld", 46.834), ("Amsteg", 46.772), ("Göschenen", 46.672), ("Airolo", 46.527), ("Faido", 46.466), ("Biasca", 46.355)]
+RAMO_PASSO = [(46.672, 370), (46.636, 440), (46.5588, 520), (46.527, 680)]   # Göschenen, Andermatt, Passo, Airolo
+Y_GALLERIA, Y_PASSO, CORSIA = 78, 158, 14            # y della corsia «verso sud»; quella «verso nord» è CORSIA più in basso
+LIVELLO_WAZE = {1: "🟡", 2: "🟡", 3: "🟠", 4: "🔴", 5: "🔴"}
 
-def _slot(righe, nome, inizio, ampiezza):
-    """Quarti d'ora (0-95) → valore, dalle righe del CSV sintetico (più recenti prima)."""
-    valori = {}
-    for r in righe:
-        if r.get(nome, "") == "":
+def _nome(senso, tratta, percorso):
+    lunga = {"NS": "NS Erstfeld-Biasca", "SN": "SN Biasca-Erstfeld"}
+    corta = {"NS": "NS Amsteg-Faido", "SN": "SN Faido-Amsteg"}
+    return f"{(lunga if tratta == 'lunga' else corta)[senso]} {percorso}"
+
+def _valore(riga, nome):
+    v = (riga or {}).get(nome, "")
+    return None if v in ("", None) else int(v)
+
+def situazione(righe_per_fonte, fonte_colore="apple"):
+    """Ritardi per tratto di strada da una riga per fonte (stesso momento).
+    centro = Amsteg–Faido; esterni = Erstfeld–Biasca meno Amsteg–Faido (i due estremi insieme)."""
+    riga = righe_per_fonte.get(fonte_colore)
+    s = {}
+    for senso in ("NS", "SN"):
+        for percorso in ("tunnel", "passo"):
+            s[(senso, percorso)] = _valore(riga, _nome(senso, "corta", percorso))
+        lunga, corta = _valore(riga, _nome(senso, "lunga", "tunnel")), _valore(riga, _nome(senso, "corta", "tunnel"))
+        s[(senso, "esterni")] = None if lunga is None or corta is None else lunga - corta
+    return s
+
+def _x_da_lat(lat, punti):
+    """Posizione orizzontale sullo schema per interpolazione sulle latitudini (la strada corre da nord a sud)."""
+    for (la1, x1), (la2, x2) in zip(punti, punti[1:]):
+        if la1 >= lat >= la2:
+            return x1 + (x2 - x1) * (la1 - lat) / (la1 - la2)
+    return None
+
+def _senso_waze(strada):
+    """Il senso si legge dalla destinazione nel nome della strada («A2 > Zürich / Luzern …» = verso nord)."""
+    # ponytail: euristica sul testo di Waze; se non c'è una destinazione nota la coda va su entrambe le corsie
+    s = (strada or "").lower()
+    if any(n in s for n in ("zürich", "zurich", "luzern", "basel", "altdorf")):
+        return "SN"
+    if any(n in s for n in ("chiasso", "lugano", "bellinzona", "milano", "biasca")):
+        return "NS"
+    return None
+
+def _parallela(punti, d):
+    """La stessa linea spostata di d a destra del verso di percorrenza (giunti ad angolo), per affiancare le corsie."""
+    import math
+    if d == 0:
+        return punti
+    normali = []
+    for (x1, y1), (x2, y2) in zip(punti, punti[1:]):
+        l = math.hypot(x2 - x1, y2 - y1)
+        normali.append((-(y2 - y1) / l, (x2 - x1) / l))
+    out = []
+    for i, (x, y) in enumerate(punti):
+        a, b = normali[max(i - 1, 0)], normali[min(i, len(normali) - 1)]
+        nx, ny = a[0] + b[0], a[1] + b[1]
+        scala = d * 2 / (nx * nx + ny * ny)                       # spostamento d da entrambi i segmenti nel giunto
+        out.append((x + nx * scala, y + ny * scala))
+    return out
+
+def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
+    W, H = 1000, 250 + 16 * len(numeri)
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
+         f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
+         f"<title>{titolo}</title>", f'<rect width="{W}" height="{H}" rx="8" fill="#ffffff"/>',
+         f'<text x="16" y="26" fill="#202124" font-size="15" font-weight="700">{titolo}</text>']
+    if sottotitolo:
+        o.append(f'<text x="16" y="44" fill="#5f6368" font-size="11">{sottotitolo}</text>')
+    colore = (lambda v: "#e3e5e8") if sit is None else (lambda v: COLORI[pallino("" if v is None else v)])
+    sit = sit or {}
+
+    def corsie(punti, y, chiave_sud, chiave_nord):
+        for k, (senso, chiave) in enumerate((("NS", chiave_sud), ("SN", chiave_nord))):
+            pts = " ".join(f"{x:.1f},{yy:.1f}" for x, yy in _parallela(punti, k * CORSIA))
+            o.append(f'<polyline points="{pts}" fill="none" stroke="{colore(sit.get(chiave))}" stroke-width="10" stroke-linejoin="round"/>')
+
+    # Rami: prima il passo (sotto), poi la strada principale e la galleria.
+    corsie([(X["Göschenen"], Y_GALLERIA), (X["Göschenen"] + 30, Y_PASSO), (X["Airolo"] - 30, Y_PASSO), (X["Airolo"], Y_GALLERIA)],
+           0, ("NS", "passo"), ("SN", "passo"))
+    o.append(f'<rect x="{X["Göschenen"] + 20}" y="{Y_GALLERIA - 10}" width="{X["Airolo"] - X["Göschenen"] - 40}" height="{CORSIA + 20}" rx="6" fill="#3c4043"/>')
+    for a, b, chiave in (("Erstfeld", "Amsteg", "esterni"), ("Amsteg", "Göschenen", "tunnel"), ("Göschenen", "Airolo", "tunnel"),
+                         ("Airolo", "Faido", "tunnel"), ("Faido", "Biasca", "esterni")):
+        corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave))
+    o.append(f'<text x="{(X["Göschenen"] + X["Airolo"]) / 2:.0f}" y="{Y_GALLERIA - 16}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Galleria 17 km</text>')
+    xp = RAMO_PASSO[2][1]
+    o.append(f'<path d="M{xp - 11},{Y_PASSO + CORSIA + 22} L{xp},{Y_PASSO + CORSIA + 8} L{xp + 11},{Y_PASSO + CORSIA + 22} Z" fill="#3c4043"/>')
+    o.append(f'<text x="{xp}" y="{Y_PASSO + CORSIA + 36}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Passo 2106 m</text>')
+    o.append(f'<text x="{RAMO_PASSO[1][1]}" y="{Y_PASSO + CORSIA + 22}" text-anchor="middle" fill="#5f6368" font-size="11">Andermatt</text>')
+    for n, x in X.items():
+        o.append(f'<line x1="{x}" y1="{Y_GALLERIA - 12}" x2="{x}" y2="{Y_GALLERIA + CORSIA + 6}" stroke="#ffffff" stroke-width="2"/>')
+        o.append(f'<text x="{x}" y="{Y_GALLERIA - 16 if n not in ("Göschenen", "Airolo") else Y_GALLERIA - 30}" text-anchor="middle" fill="#5f6368" font-size="11">{n}</text>')
+    o.append(f'<text x="96" y="{Y_GALLERIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">verso sud →</text>')
+    o.append(f'<text x="96" y="{Y_GALLERIA + CORSIA + 4}" text-anchor="end" fill="#5f6368" font-size="11">← verso nord</text>')
+
+    # Code segnalate da Waze, nel punto in cui sono: barra con bordo scuro sopra la corsia.
+    for c in code_waze:
+        lat, lon = float(c["lat"]), float(c["lon"])
+        sul_passo = lon < 8.60 and 46.535 < lat < 46.66
+        x = _x_da_lat(lat, RAMO_PASSO if sul_passo else [(la, X[n]) for n, la in LAT])
+        if x is None:
             continue
-        t = datetime.strptime(r["ora"], "%Y-%m-%d %H:%M").replace(tzinfo=ZURIGO)
-        i = int((t - inizio).total_seconds() // 900)
-        for k in range(i, i + ampiezza):
-            if 0 <= k < 96:
-                valori.setdefault(k, r[nome])
-    return valori
+        y0 = Y_PASSO if sul_passo else Y_GALLERIA
+        largo = max(6, float(c.get("lunghezza_m") or 0) / 1000 * 11.6)
+        sensi = [_senso_waze(c.get("strada"))] if _senso_waze(c.get("strada")) else ["NS", "SN"]
+        for senso in sensi:
+            y = y0 + (CORSIA if senso == "SN" else 0)
+            o.append(f'<rect x="{x - largo / 2:.0f}" y="{y - 6}" width="{largo:.0f}" height="12" rx="3" '
+                     f'fill="{COLORI[LIVELLO_WAZE.get(int(c.get("livello") or 3), "🟠")]}" stroke="#202124" stroke-width="1.5"/>')
+        km = f'{float(c.get("lunghezza_m") or 0) / 1000:.1f}'.replace(".", ",")
+        o.append(f'<text x="{x:.0f}" y="{y0 + 2 * CORSIA + 12 if not sul_passo else y0 - 12}" text-anchor="middle" fill="#202124" font-size="10">Waze {km} km</text>')
 
-def grafico(serie, fonti, adesso, totali=None):
-    inizio = adesso - timedelta(hours=24) + timedelta(minutes=15)   # l'ultimo quarto d'ora (indice 95) è quello di adesso
-    ETICHETTE, LARGO, ALTO, SPAZIO, TITOLO = 210, 8, 9, 2, 34
-    blocco = TITOLO + len(fonti) * (ALTO + SPAZIO) + 10
-    DESTRA = 64                                                   # colonna del tempo totale attuale
-    W = ETICHETTE + 96 * LARGO + DESTRA
-    H = 20 + len(MISURE) * blocco + 56
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
-           f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
-           "<title>Ritardo nelle ultime 24 ore, per misura e per fonte</title>",
-           f'<rect width="{W}" height="{H}" rx="8" fill="#ffffff"/>']
-    for i in range(0, 97, 12):                                    # una tacca ogni 3 ore
-        x, t = ETICHETTE + i * LARGO, inizio + timedelta(minutes=15 * i)
-        out.append(f'<line x1="{x}" y1="16" x2="{x}" y2="{H - 52}" stroke="#eceef1"/>')
-        out.append(f'<text x="{x}" y="{H - 38}" text-anchor="{"end" if i == 96 else "middle"}" fill="#5f6368">{"adesso" if i == 96 else f"{t:%H:%M}"}</text>')
-    if totali:
-        out.append(f'<text x="{ETICHETTE + 96 * LARGO + 8}" y="14" fill="#5f6368" font-size="10">totale</text>')
-    y = 20
-    for nome, o, d, percorso in MISURE:
-        out.append(f'<text x="10" y="{y + 24}" fill="#202124" font-weight="600">{nome}</text>')
-        # Fondo bianco sotto lo schema: la griglia delle ore non deve far sembrare le località degli orari.
-        out.append(f'<rect x="{ETICHETTE - 4}" y="{y + 2}" width="{96 * LARGO + 8}" height="{TITOLO - 4}" fill="#ffffff"/>')
-        out += _percorso(o, d, percorso, ETICHETTE + 6, ETICHETTE + 96 * LARGO - 6, y + 20)
-        y += TITOLO
-        for f in fonti:
-            out.append(f'<text x="{ETICHETTE - 8}" y="{y + 8}" text-anchor="end" fill="#5f6368" font-size="10">{f}</text>')
-            out.append(f'<rect x="{ETICHETTE}" y="{y}" width="{96 * LARGO}" height="{ALTO}" fill="{COLORI["⚪"]}"/>')
-            # Quarti d'ora consecutivi dello stesso colore in un solo rettangolo: niente righine tra un tratto e l'altro.
-            tratti = []
-            for i, v in sorted(_slot(serie.get(f, []), nome, inizio, ORARIE_SLOT.get(f, 1)).items()):
-                colore = COLORI[pallino(v)]
-                if tratti and tratti[-1][2] == colore and tratti[-1][0] + tratti[-1][1] == i:
-                    tratti[-1][1] += 1
-                else:
-                    tratti.append([i, 1, colore])
-            for i, n, colore in tratti:
-                out.append(f'<rect x="{ETICHETTE + i * LARGO}" y="{y}" width="{n * LARGO}" height="{ALTO}" fill="{colore}"/>')
-            totale = (totali or {}).get(f, {}).get(nome)
-            if totale is not None:
-                out.append(f'<text x="{ETICHETTE + 96 * LARGO + 8}" y="{y + 8}" fill="#202124" font-size="10">{totale} min</text>')
-            y += ALTO + SPAZIO
-        y += 10
-    x = ETICHETTE                                                 # legenda: il colore non è mai da solo
-    for simbolo, testo in LEGENDA:
-        out.append(f'<rect x="{x}" y="{H - 22}" width="12" height="9" fill="{COLORI[simbolo]}"/>')
-        out.append(f'<text x="{x + 16}" y="{H - 14}" fill="#5f6368" font-size="11">{testo}</text>')
-        x += 28 + 7 * len(testo)
-    out.append("</svg>")
-    return "\n".join(out) + "\n"
+    y = 232
+    for riga in numeri:
+        o.append(f'<text x="16" y="{y}" fill="#3c4043" font-size="11">{riga}</text>')
+        y += 16
+    x = 560                                                      # legenda in alto a destra
+    for simbolo, testo in LEGENDA[:4]:
+        o.append(f'<rect x="{x}" y="16" width="12" height="9" fill="{COLORI[simbolo]}"/>')
+        o.append(f'<text x="{x + 16}" y="25" fill="#5f6368" font-size="10">{testo}</text>')
+        x += 24 + 6 * len(testo)
+    o.append("</svg>")
+    return "\n".join(o) + "\n"
+
+
+# ---------------------------------------------------------------------------------------------
+# Pagine: il README mostra l'ultimo rilievo, una mappa per fonte; «◀ 15 minuti prima» porta alle pagine precedenti.
+# Ogni mappa ha l'orario nel nome e non cambia più: a ogni giro si aggiungono solo le mappe nuove.
+
+FONTI_MAPPA = (("apple", "Apple Maps"), ("tomtom", "TomTom"), ("google", "Google"),
+               ("openwebninja", "Waze (OpenWeb Ninja)"), ("apify", "Waze (Apify)"))
+PASSI_STORIA = 12                      # 3 ore di quarti d'ora
+
+def nome_mappa(quando, fonte):
+    return f"mappe/{quando:%Y-%m-%d-%H%M}-{fonte}.svg"
+
+def numeri_fonte(riga, totali):
+    """Righe di testo sotto la mappa: ritardo e tempo totale su Erstfeld–Biasca, per senso e percorso."""
+    out = []
+    for senso, testo in (("NS", "verso sud"), ("SN", "verso nord")):
+        parti = []
+        for perc, nome_p in (("tunnel", "galleria"), ("passo", "passo")):
+            n = _nome(senso, "lunga", perc)
+            v, t = _valore(riga, n), (totali or {}).get(n)
+            parti.append(f"{nome_p} " + ("nessun dato" if v is None else f"{'+' if v > 0 else ''}{v} min" + (f" · totale {t} min" if t is not None else "")))
+        out.append(f"Erstfeld–Biasca {testo}: " + "   |   ".join(parti))
+    return out
+
+def mappa_fonte(fonte, quando, riga=None, totali=None, code_waze=None, ora_misura=None):
+    etichetta = dict(FONTI_MAPPA)[fonte]
+    titolo = f"{etichetta} — {quando:%H:%M}"
+    sotto = f"misura delle {ora_misura}" if ora_misura and ora_misura != f"{quando:%Y-%m-%d %H:%M}" else ""
+    if code_waze is not None:
+        n = len(code_waze)
+        return mappa(titolo, None, code_waze, ["nessuna coda segnalata da Waze" if n == 0 else "1 coda segnalata da Waze" if n == 1 else f"{n} code segnalate da Waze"], sotto)
+    if riga is None:
+        return mappa(titolo, {}, (), ["nessun dato in questo quarto d'ora"], sotto)
+    return mappa(titolo, situazione({fonte: riga}, fonte), (), numeri_fonte(riga, totali), sotto)
+
+def pagine(adesso, esiste):
+    """{percorso: testo markdown} per il README e le pagine storia/<minuti>.md; esiste(percorso) dice se una mappa c'è."""
+    out = {}
+    for k in range(PASSI_STORIA):
+        quando = adesso - timedelta(minutes=15 * k)
+        su = "" if k == 0 else "../"
+        quanto = "adesso" if k == 0 else f"{15 * k} minuti fa" if k < 4 else (f"{k // 4} h {15 * (k % 4)} min fa" if k % 4 else f"{k // 4} h fa")
+        link = []
+        if k < PASSI_STORIA - 1:
+            link.append(f"[◀ 15 minuti prima]({'storia/' if k == 0 else ''}{15 * (k + 1)}.md)")
+        if k > 0:
+            link.append(f"[Adesso]({su}README.md)")
+            link.append(f"[15 minuti dopo ▶]({'../README.md' if k == 1 else f'{15 * (k - 1)}.md'})")
+        righe = [f"# Gottardo — traffico alle {quando:%H:%M}", "", f"**{quando:%d.%m.%Y %H:%M}** (ora svizzera, {quanto})", "",
+                 " · ".join(link), "",
+                 " · ".join(f"{p} {t}" for p, t in LEGENDA[:4]) + " · le barre con bordo nero sono code segnalate da Waze", ""]
+        for fonte, etichetta in FONTI_MAPPA:
+            m = nome_mappa(quando, fonte)
+            righe += [f"### {etichetta}", "", f"![{etichetta}]({su}{m})" if esiste(m) else "_nessuna mappa per questo quarto d'ora_", ""]
+        righe += [" · ".join(link), ""]
+        out["README.md" if k == 0 else f"storia/{15 * k}.md"] = "\n".join(righe)
+    return out

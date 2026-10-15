@@ -153,36 +153,8 @@ def prova_pallini():
     from pagina import pallino
     assert [pallino(v) for v in ("", "0", "-2", "1", "9", "10", "39", "40", "120")] == ["⚪", "🟢", "🟢", "🟡", "🟡", "🟠", "🟠", "🔴", "🔴"]
 
-def prova_readme_e_grafico():
-    from pagina import readme, grafico
-    from archivio import INTESTAZIONE
-    from config import MISURE, ZURIGO
-    adesso = datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO)
-    valori = {"NS Erstfeld-Biasca tunnel": "12", "SN Biasca-Erstfeld passo": "45", "NS Amsteg-Faido tunnel": "3"}
-    riga = {"ora": "2026-10-16 17:15", "esito": "ok", **{m[0]: valori.get(m[0], "0") for m in MISURE}}
-    riga["NS Erstfeld-Biasca passo"] = ""
-    serie = {"apple": [riga], "tomtom": []}
-    testo = readme(serie, ["apple", "tomtom"], "2026-10-16 17:15")
-    assert "| NS Erstfeld-Biasca tunnel | 🟠 +12 | ⚪ — |" in testo           # 12 min: arancione (giallo solo sotto 10)
-    assert "| NS Amsteg-Faido tunnel | 🟡 +3 | ⚪ — |" in testo
-    assert "| SN Biasca-Erstfeld passo | 🔴 +45 | ⚪ — |" in testo
-    assert "grafico.svg" in testo and testo.count("\n| ") == len(MISURE) + 1
-    svg = grafico(serie, ["apple", "tomtom"], adesso)
-    assert svg.startswith("<svg") and svg.rstrip().endswith("</svg>")
-    assert all(m[0] in svg for m in MISURE) and "#ffcc00" in svg and "#ff6f00" in svg and "#c62828" in svg
-
-def prova_tappe_del_percorso():
-    from pagina import tappe
-    assert tappe("Erstfeld", "Biasca", "tunnel") == ["Erstfeld", "Amsteg", "Göschenen", "Galleria", "Airolo", "Faido", "Biasca"]
-    assert tappe("Faido", "Amsteg", "passo") == ["Faido", "Airolo", "Passo", "Andermatt", "Göschenen", "Amsteg"]
-    from pagina import grafico
-    from config import ZURIGO
-    svg = grafico({}, ["apple"], datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO))
-    assert all(n in svg for n in ("Erstfeld", "Amsteg", "Göschenen", "Airolo", "Faido", "Biasca", "Andermatt", "Galleria", "Passo"))
-
 def prova_tempi_totali():
     from archivio import aggiungi_in_cima, file_mese, righe_dettaglio, risultato, ultimi_totali, INTESTAZIONE_DETTAGLIO
-    from pagina import readme, grafico
     from config import MISURE, ZURIGO
     adesso = datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO)
     with tempfile.TemporaryDirectory() as d:
@@ -194,11 +166,58 @@ def prova_tempi_totali():
         aggiungi_in_cima(p, INTESTAZIONE_DETTAGLIO, righe_dettaglio("2026-10-16 17:15", "x", nuovi))
         totali = ultimi_totali(d, "apple", adesso)
         assert totali[MISURE[0][0]] == 64 and MISURE[1][0] not in totali     # solo l'ultimo giro, senza le misure fallite
-        riga = {"ora": "2026-10-16 17:15", "esito": "ok", **{m[0]: "12" for m in MISURE}}
-        testo = readme({"apple": [riga]}, ["apple"], "2026-10-16 17:15", totali={"apple": totali})
-        assert f"| {MISURE[0][0]} | 🟠 +12 · 64 min |" in testo
-        svg = grafico({"apple": [riga]}, ["apple"], adesso, totali={"apple": totali})
-        assert ">64 min<" in svg
+
+def prova_situazione():
+    from pagina import situazione
+    from config import MISURE
+    riga = {m[0]: "0" for m in MISURE}
+    riga.update({"SN Biasca-Erstfeld tunnel": "58", "SN Faido-Amsteg tunnel": "50", "SN Faido-Amsteg passo": "6", "NS Amsteg-Faido tunnel": ""})
+    s = situazione({"apple": riga})
+    assert s[("SN", "tunnel")] == 50 and s[("SN", "esterni")] == 8 and s[("SN", "passo")] == 6
+    assert s[("NS", "tunnel")] is None and s[("NS", "esterni")] is None       # manca il centro: niente differenza inventata
+    assert situazione({}) == {k: None for k in s}                               # fonte assente: tutto grigio
+
+def prova_waze_posizione_e_senso():
+    from pagina import _senso_waze, _x_da_lat, X, LAT, RAMO_PASSO
+    assert _senso_waze("A2 > Zürich / Luzern / San Gottardo") == "SN" and _senso_waze("A2 > Chiasso / Lugano") == "NS"
+    assert _senso_waze("Via Cantonale") is None
+    corridoio = [(la, X[n]) for n, la in LAT]
+    assert _x_da_lat(46.672, corridoio) == X["Göschenen"] and X["Göschenen"] < _x_da_lat(46.60, corridoio) < X["Airolo"]
+    assert _x_da_lat(47.10, corridoio) is None                                  # fuori dalla strada: non si disegna
+    assert _x_da_lat(46.5588, RAMO_PASSO) == RAMO_PASSO[2][1]
+
+def prova_corsie_parallele():
+    from pagina import _parallela
+    assert _parallela([(0, 0), (10, 0)], 14) == [(0, 14), (10, 14)]
+    assert [tuple(round(v, 6) for v in p) for p in _parallela([(0, 0), (10, 0), (10, 10)], 2)] == [(0, 2), (8, 2), (8, 10)]
+
+def prova_mappe_per_fonte():
+    from pagina import mappa_fonte
+    from config import MISURE, ZURIGO
+    q = datetime(2026, 10, 18, 15, 15, tzinfo=ZURIGO)
+    riga = {m[0]: "12" for m in MISURE}
+    svg = mappa_fonte("google", q, riga, {"NS Erstfeld-Biasca tunnel": 64}, ora_misura="2026-10-18 15:00")
+    assert "Google — 15:15" in svg and "misura delle 2026-10-18 15:00" in svg and "+12 min · totale 64 min" in svg and "#ff6f00" in svg
+    assert "misura delle" not in mappa_fonte("apple", q, riga, ora_misura="2026-10-18 15:15")
+    assert "nessun dato in questo quarto d'ora" in mappa_fonte("tomtom", q)
+    coda = {"strada": "A2 > Zürich", "lat": 46.50, "lon": 8.66, "lunghezza_m": 2100, "livello": 4}
+    w = mappa_fonte("apify", q, code_waze=[coda])
+    assert "1 coda segnalata da Waze" in w and "Waze 2,1 km" in w and "#c62828" in w
+    assert "nessuna coda segnalata da Waze" in mappa_fonte("openwebninja", q, code_waze=[])
+
+def prova_pagine_e_link():
+    from pagina import pagine, nome_mappa, PASSI_STORIA
+    from config import ZURIGO
+    adesso = datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO)
+    p = pagine(adesso, lambda m: "-apify" not in m)                              # mappe Apify mancanti
+    assert set(p) == {"README.md"} | {f"storia/{15 * k}.md" for k in range(1, PASSI_STORIA)}
+    assert "[◀ 15 minuti prima](storia/15.md)" in p["README.md"] and "15 minuti dopo" not in p["README.md"]
+    assert f"![Apple Maps]({nome_mappa(adesso, 'apple')})" in p["README.md"]
+    s15 = p["storia/15.md"]
+    assert "[◀ 15 minuti prima](30.md)" in s15 and "[15 minuti dopo ▶](../README.md)" in s15 and "[Adesso](../README.md)" in s15
+    assert "](../mappe/2026-10-18-1445-apple.svg)" in s15 and "_nessuna mappa per questo quarto d'ora_" in s15
+    ultima = p[f"storia/{15 * (PASSI_STORIA - 1)}.md"]
+    assert "15 minuti prima" not in ultima and f"[15 minuti dopo ▶]({15 * (PASSI_STORIA - 2)}.md)" in ultima
 
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
