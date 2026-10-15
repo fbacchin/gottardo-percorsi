@@ -69,6 +69,40 @@ def prova_quote():
     assert not consenti(uso, "tomtom", 8, ott) and consenti(uso, "tomtom", 8, ott + timedelta(days=1))   # tetto giornaliero
     assert consenti(uso, "apple", 5, ott)                                  # nessun tetto
 
+import json as _json
+def _campione(nome):
+    return _json.load(open(nome, encoding="utf-8"))
+
+def prova_pem_su_una_riga():
+    from fonti import pem
+    corpo = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg" + "A" * 80
+    completo = pem(corpo)
+    assert completo.startswith("-----BEGIN PRIVATE KEY-----\n") and completo.endswith("-----END PRIVATE KEY-----\n")
+    assert pem(completo) == completo and pem(completo.replace("\n", " ")) == completo
+
+def prova_apple_coppie():
+    from fonti import coppie_apple
+    c = coppie_apple()
+    assert len(c) == 5 and sum(len(v) for v in c.values()) == 12 and all(len(v) <= 10 for v in c.values())
+
+def prova_apple_campione():
+    from fonti import apple
+    from config import MISURE, PUNTI
+    c = _campione("privati/campioni/apple-etas.json")
+    origine = "origin=%s,%s" % PUNTI["Erstfeld"]
+    chiama = lambda metodo, url, intestazioni=None, corpo=None: (c["codice"], c["risposta"]) if origine in url else (200, {"etas": []})
+    rs = apple("t", chiama)
+    assert [r["misura"] for r in rs] == [m[0] for m in MISURE]
+    tunnel = rs[0]                                               # NS Erstfeld-Biasca tunnel: nel campione
+    assert tunnel["esito"] == "ok" and tunnel["con_traffico_s"] >= tunnel["senza_traffico_s"] > 0 and tunnel["distanza_m"] > 50000
+    assert rs[1]["esito"] == "percorso non trovato"             # passo: manca Passo→Biasca, mai un tempo a metà
+    assert rs[2]["esito"] == "percorso non trovato"
+
+def prova_apple_errore():
+    from fonti import apple
+    rs = apple("t", lambda *a, **k: (503, None))
+    assert all(r["esito"] == "errore 503" and r["con_traffico_s"] is None for r in rs)
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
