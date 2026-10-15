@@ -71,7 +71,7 @@ def _parallela(punti, d):
         out.append((x + nx * scala, y + ny * scala))
     return out
 
-def _frecce(linea, al_contrario, passo=70):
+def _frecce(linea, al_contrario, passo=160):
     """Frecce (→) dentro la corsia nel senso di marcia: almeno una per tratto, così si leggono anche le diagonali degli svincoli."""
     import math
     out = []
