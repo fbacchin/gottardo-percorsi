@@ -9,7 +9,7 @@ PUNTI = {
     "Erstfeld": (46.83446, 8.63694),
     "Amsteg":   (46.77208, 8.66830),
     "Faido":    (46.46584, 8.82325),
-    "Biasca":   (46.35529, 8.95720),
+    "Biasca":   (46.35530, 8.96100),   # strada locale a est dello svincolo: sulla rampa Apple lo agganciava alla carreggiata verso sud (Biasca→Faido 52,8 km)
     "Passo":    (46.55880, 8.56210),
 }
 VALICO = "Passo"   # punto obbligato del percorso «passo»
