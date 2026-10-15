@@ -15,14 +15,14 @@ PUNTI = {
 VALICO = "Passo"   # punto obbligato del percorso «passo»
 
 # (nome = intestazione CSV, origine, destinazione, percorso). NS = nord→sud, SN = sud→nord.
-MISURE = [
+MISURE = [   # prima i percorsi col tunnel, poi quelli sul passo (richiesta dell'utente)
     ("NS Erstfeld-Biasca tunnel", "Erstfeld", "Biasca", "tunnel"),
-    ("NS Erstfeld-Biasca passo",  "Erstfeld", "Biasca", "passo"),
     ("SN Biasca-Erstfeld tunnel", "Biasca", "Erstfeld", "tunnel"),
-    ("SN Biasca-Erstfeld passo",  "Biasca", "Erstfeld", "passo"),
     ("NS Amsteg-Faido tunnel",    "Amsteg", "Faido", "tunnel"),
-    ("NS Amsteg-Faido passo",     "Amsteg", "Faido", "passo"),
     ("SN Faido-Amsteg tunnel",    "Faido", "Amsteg", "tunnel"),
+    ("NS Erstfeld-Biasca passo",  "Erstfeld", "Biasca", "passo"),
+    ("SN Biasca-Erstfeld passo",  "Biasca", "Erstfeld", "passo"),
+    ("NS Amsteg-Faido passo",     "Amsteg", "Faido", "passo"),
     ("SN Faido-Amsteg passo",     "Faido", "Amsteg", "passo"),
 ]
 

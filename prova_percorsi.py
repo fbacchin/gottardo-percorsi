@@ -93,10 +93,11 @@ def prova_apple_campione():
     chiama = lambda metodo, url, intestazioni=None, corpo=None: (c["codice"], c["risposta"]) if origine in url else (200, {"etas": []})
     rs = apple("t", chiama)
     assert [r["misura"] for r in rs] == [m[0] for m in MISURE]
-    tunnel = rs[0]                                               # NS Erstfeld-Biasca tunnel: nel campione
+    tunnel = [r for r in rs if r["misura"] == "NS Erstfeld-Biasca tunnel"][0]   # nel campione
     assert tunnel["esito"] == "ok" and tunnel["con_traffico_s"] >= tunnel["senza_traffico_s"] > 0 and tunnel["distanza_m"] > 50000
-    assert rs[1]["esito"] == "percorso non trovato"             # passo: manca Passo→Biasca, mai un tempo a metà
-    assert rs[2]["esito"] == "percorso non trovato"
+    per_nome = {r["misura"]: r for r in rs}
+    assert per_nome["NS Erstfeld-Biasca passo"]["esito"] == "percorso non trovato"   # manca Passo→Biasca: mai un tempo a metà
+    assert per_nome["SN Biasca-Erstfeld tunnel"]["esito"] == "percorso non trovato"
 
 def prova_apple_errore():
     from fonti import apple
@@ -147,6 +148,37 @@ def prova_waze_errori():
     from fonti import waze_openwebninja, waze_apify
     assert waze_openwebninja("k", lambda *a, **k: (429, None)) == (None, "errore 429")
     assert waze_apify("k", lambda *a, **k: (402, {"error": "x"})) == (None, "errore 402")
+
+def prova_pallini():
+    from pagina import pallino
+    assert [pallino(v) for v in ("", "0", "-2", "1", "9", "10", "39", "40", "120")] == ["⚪", "🟢", "🟢", "🟡", "🟡", "🟠", "🟠", "🔴", "🔴"]
+
+def prova_readme_e_grafico():
+    from pagina import readme, grafico
+    from archivio import INTESTAZIONE
+    from config import MISURE, ZURIGO
+    adesso = datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO)
+    valori = {"NS Erstfeld-Biasca tunnel": "12", "SN Biasca-Erstfeld passo": "45", "NS Amsteg-Faido tunnel": "3"}
+    riga = {"ora": "2026-10-16 17:15", "esito": "ok", **{m[0]: valori.get(m[0], "0") for m in MISURE}}
+    riga["NS Erstfeld-Biasca passo"] = ""
+    serie = {"apple": [riga], "tomtom": []}
+    testo = readme(serie, ["apple", "tomtom"], "2026-10-16 17:15")
+    assert "| NS Erstfeld-Biasca tunnel | 🟠 +12 | ⚪ — |" in testo           # 12 min: arancione (giallo solo sotto 10)
+    assert "| NS Amsteg-Faido tunnel | 🟡 +3 | ⚪ — |" in testo
+    assert "| SN Biasca-Erstfeld passo | 🔴 +45 | ⚪ — |" in testo
+    assert "grafico.svg" in testo and testo.count("\n| ") == len(MISURE) + 1
+    svg = grafico(serie, ["apple", "tomtom"], adesso)
+    assert svg.startswith("<svg") and svg.rstrip().endswith("</svg>")
+    assert all(m[0] in svg for m in MISURE) and "#ffcc00" in svg and "#ff6f00" in svg and "#c62828" in svg
+
+def prova_tappe_del_percorso():
+    from pagina import tappe
+    assert tappe("Erstfeld", "Biasca", "tunnel") == ["Erstfeld", "Amsteg", "Göschenen", "Galleria", "Airolo", "Faido", "Biasca"]
+    assert tappe("Faido", "Amsteg", "passo") == ["Faido", "Airolo", "Passo", "Andermatt", "Göschenen", "Amsteg"]
+    from pagina import grafico
+    from config import ZURIGO
+    svg = grafico({}, ["apple"], datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO))
+    assert all(n in svg for n in ("Erstfeld", "Amsteg", "Göschenen", "Airolo", "Faido", "Biasca", "Andermatt", "Galleria", "Passo"))
 
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
