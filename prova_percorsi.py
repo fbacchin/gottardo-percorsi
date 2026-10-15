@@ -219,6 +219,86 @@ def prova_pagine_e_link():
     ultima = p[f"storia/{15 * (PASSI_STORIA - 1)}.md"]
     assert "15 minuti prima" not in ultima and f"[15 minuti dopo ▶]({15 * (PASSI_STORIA - 2)}.md)" in ultima
 
+import io, contextlib, glob, json
+
+SEGRETI_FINTI = {"APPLE_MAPS_KEY_ID": "SEGRETO-KID", "APPLE_TEAM_ID": "SEGRETO-TEAM", "APPLE_MAPS_PRIVATE_KEY": "SEGRETO-PEM",
+                 "TOMTOM_KEY": "SEGRETO-TOMTOM", "GOOGLE_ROUTES_KEY": "SEGRETO-GOOGLE", "OPENWEBNINJA_KEY": "SEGRETO-OWN", "APIFY_TOKEN": "SEGRETO-APIFY"}
+
+def _giro_finto(adesso, chiama, env=SEGRETI_FINTI, d=None):
+    from giro import giro
+    d = d or tempfile.mkdtemp()
+    pub, priv = os.path.join(d, "pub"), os.path.join(d, "priv")
+    uscita = io.StringIO()
+    with contextlib.redirect_stdout(uscita), contextlib.redirect_stderr(uscita):
+        giro(adesso, env, pub, priv, chiama)
+    return pub, priv, uscita.getvalue()
+
+def _tutti_i_file(*cartelle):
+    return "".join(open(p, encoding="utf-8").read() for c in cartelle for p in glob.glob(c + "/**/*", recursive=True) if os.path.isfile(p))
+
+def prova_giro_segreti_mai_in_uscita():
+    from config import ZURIGO
+    def chiama_che_fallisce(metodo, url, intestazioni=None, corpo=None):
+        raise RuntimeError("errore con dentro " + url + str(intestazioni))   # il caso peggiore: un'eccezione che si porta dietro l'URL
+    pub, priv, uscita = _giro_finto(datetime(2026, 10, 16, 17, 0, tzinfo=ZURIGO), chiama_che_fallisce)
+    tutto = uscita + _tutti_i_file(pub, priv)
+    assert not any(s in tutto for s in SEGRETI_FINTI.values()), "un segreto è finito in uscita o nei file"
+
+def prova_giro_cosa_e_dove():
+    from config import ZURIGO
+    risposte = lambda metodo, url, intestazioni=None, corpo=None: (503, None)
+    pub, priv, _ = _giro_finto(datetime(2026, 10, 16, 17, 16, 30, tzinfo=ZURIGO), risposte, {"TOMTOM_KEY": "k", "GOOGLE_ROUTES_KEY": "g"})
+    assert os.path.exists(f"{priv}/dati/tomtom-2026-10.csv") and os.path.exists(f"{priv}/dati/tomtom-2026-10-dettaglio.csv")
+    assert "2026-10-16 17:15" in open(f"{priv}/dati/tomtom-2026-10.csv", encoding="utf-8").read()   # ora del quarto d'ora
+    assert not glob.glob(f"{priv}/dati/apple-*")                               # senza chiave la fonte non gira
+    assert not glob.glob(f"{priv}/dati/google-*")                              # :15, non è il giro dell'ora
+    assert not os.path.exists(pub) or not _tutti_i_file(pub)                   # nel pubblico non si scrive niente
+    assert os.path.exists(f"{priv}/mappe/2026-10-16-1715-tomtom.svg") and not glob.glob(f"{priv}/mappe/*-apple.svg")
+    assert os.path.exists(f"{priv}/README.md") and os.path.exists(f"{priv}/storia/15.md")
+    pub, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), risposte, {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"})
+    assert os.path.exists(f"{priv}/dati/google-2026-10.csv") and os.path.exists(f"{priv}/dati/waze-openwebninja-2026-10.csv")
+    uso = json.load(open(f"{priv}/uso.json"))
+    assert uso["google"]["2026-10"] == 8 and uso["openwebninja"]["2026-10"] == 1
+
+def prova_giro_orarie_tra_un_ora_e_l_altra():
+    """Alle :15 la mappa di Google e quelle di Waze usano la misura delle :00, con l'ora scritta sotto il titolo."""
+    from config import ZURIGO
+    c = _campione("privati/campioni/google-tunnel.json")
+    w = _campione("privati/campioni/openwebninja.json")
+    def risposte(metodo, url, intestazioni=None, corpo=None):
+        if "googleapis" in url: return c["codice"], c["risposta"]
+        if "openwebninja" in url: return w["codice"], w["risposta"]
+        return 503, None
+    d = tempfile.mkdtemp()
+    env = {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"}
+    _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), risposte, env, d)
+    _, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 15, tzinfo=ZURIGO), risposte, env, d)
+    g = open(f"{priv}/mappe/2026-10-16-1815-google.svg", encoding="utf-8").read()
+    assert "misura delle 2026-10-16 18:00" in g and "totale" in g
+    o = open(f"{priv}/mappe/2026-10-16-1815-openwebninja.svg", encoding="utf-8").read()
+    assert "misura delle 2026-10-16 18:00" in o and "Waze" in o
+    assert json.load(open(f"{priv}/uso.json"))["google"]["2026-10"] == 8   # alle :15 Google non è stato chiamato
+
+def prova_giro_cancella_mappe_vecchie():
+    from config import ZURIGO
+    d = tempfile.mkdtemp(); priv = os.path.join(d, "priv"); os.makedirs(f"{priv}/mappe")
+    for nome in ("2026-10-16-1415-apple.svg", "2026-10-16-1430-apple.svg", "appunti.txt"):   # 12 pagine: la più vecchia è 14:30
+        open(f"{priv}/mappe/{nome}", "w").write("x")
+    _giro_finto(datetime(2026, 10, 16, 17, 15, tzinfo=ZURIGO), lambda *a, **k: (503, None), {"TOMTOM_KEY": "k"}, d)
+    rimaste = sorted(os.listdir(f"{priv}/mappe"))
+    assert "2026-10-16-1415-apple.svg" not in rimaste and "2026-10-16-1430-apple.svg" in rimaste and "appunti.txt" in rimaste
+
+def prova_giro_quota_esaurita():
+    from config import ZURIGO
+    from giro import giro
+    d = tempfile.mkdtemp(); priv = os.path.join(d, "priv"); os.makedirs(priv)
+    json.dump({"google": {"2026-10": 4800}}, open(f"{priv}/uso.json", "w"))
+    chiamate = []
+    giro(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), {"GOOGLE_ROUTES_KEY": "g"}, os.path.join(d, "pub"), priv,
+         lambda *a, **k: chiamate.append(1) or (200, {}))
+    assert not chiamate                                                        # nessuna richiesta oltre il tetto
+    assert "quota esaurita" in open(f"{priv}/dati/google-2026-10.csv", encoding="utf-8").read()
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
