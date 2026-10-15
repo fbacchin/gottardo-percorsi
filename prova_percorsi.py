@@ -131,7 +131,8 @@ def prova_google_otto_misure():
 
 def prova_pallini():
     from pagina import pallino
-    assert [pallino(v) for v in ("", "0", "-2", "1", "9", "10", "39", "40", "120")] == ["⚪", "🟢", "🟢", "🟡", "🟡", "🟠", "🟠", "🔴", "🔴"]
+    # Fino a 2 minuti è verde: 1-2 minuti sono arrotondamento, non coda (richiesta dell'utente, 15.10 sera).
+    assert [pallino(v) for v in ("", "0", "-2", "1", "2", "3", "9", "10", "39", "40", "120")] == ["⚪", "🟢", "🟢", "🟢", "🟢", "🟡", "🟡", "🟠", "🟠", "🔴", "🔴"]
 
 def prova_tempi_totali():
     from archivio import aggiungi_in_cima, file_mese, righe_dettaglio, risultato, ultimi_totali, INTESTAZIONE_DETTAGLIO

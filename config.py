@@ -32,7 +32,8 @@ PUBBLICHE = set()
 ORARIE = {"google"}                                   # le altre girano ogni 15 minuti
 
 # Soglie dell'app (HistoryChartView.livello): < 1 verde, < 10 giallo, < 40 arancione, oltre rosso.
-SOGLIE = ((1, "🟢"), (10, "🟡"), (40, "🟠"))
+# Nelle mappe il verde arriva a 2 minuti: 1-2 minuti di scarto sono arrotondamento, non coda (richiesta dell'utente, 15.10).
+SOGLIE = ((3, "🟢"), (10, "🟡"), (40, "🟠"))
 COLORI = {"🟢": "#2fb350", "🟡": "#ffcc00", "🟠": "#ff6f00", "🔴": "#c62828", "⚪": "#d5d8dc"}
 
 # Tetti sotto le quote gratuite: (periodo, limite).

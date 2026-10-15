@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from config import COLORI, MISURE, SOGLIE, ZURIGO
 
-LEGENDA = (("🟢", "meno di 1 min"), ("🟡", "meno di 10"), ("🟠", "meno di 40"), ("🔴", "40 o più"), ("⚪", "nessun dato"))
+LEGENDA = (("🟢", "fino a 2 min"), ("🟡", "meno di 10"), ("🟠", "meno di 40"), ("🔴", "40 o più"), ("⚪", "nessun dato"))
 
 def pallino(v):
     if v is None or v == "":
