@@ -336,6 +336,7 @@ def prova_frecce_del_senso_di_marcia():
     svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, {})
     angoli = [float(a) for a in re.findall(r'class="freccia" transform="translate\([0-9.]+,[0-9.]+\) rotate\((-?[0-9.]+)\)', svg)]
     assert len(angoli) >= 20
+    assert 'd="M-6,0 L5,0 M1.5,-3.5 L5,0 L1.5,3.5"' in svg                                   # freccia «→» con l'asta, richiesta dell'utente
     assert any(abs(a) < 1 for a in angoli) and any(abs(abs(a) - 180) < 1 for a in angoli)       # verso sud → destra, verso nord → sinistra
     assert any(30 < a < 90 for a in angoli) and any(-90 < a < -30 for a in angoli)                # in discesa e in salita sui rami del passo
 

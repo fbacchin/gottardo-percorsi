@@ -59,7 +59,7 @@ def _parallela(punti, d):
     return out
 
 def _frecce(linea, al_contrario, passo=70):
-    """Frecce (›) dentro la corsia nel senso di marcia: almeno una per tratto, così si leggono anche le diagonali degli svincoli."""
+    """Frecce (→) dentro la corsia nel senso di marcia: almeno una per tratto, così si leggono anche le diagonali degli svincoli."""
     import math
     out = []
     for (x1, y1), (x2, y2) in zip(linea, linea[1:]):
@@ -72,7 +72,7 @@ def _frecce(linea, al_contrario, passo=70):
         for i in range(n):
             t = (i + 0.5) / n
             out.append(f'<path class="freccia" transform="translate({x1 + (x2 - x1) * t:.1f},{y1 + (y2 - y1) * t:.1f}) rotate({angolo:.1f})" '
-                       f'd="M-3,-3.5 L1.5,0 L-3,3.5" fill="none" stroke="#1d2125" stroke-opacity="0.6" stroke-width="1.8" '
+                       f'd="M-6,0 L5,0 M1.5,-3.5 L5,0 L1.5,3.5" fill="none" stroke="#1d2125" stroke-opacity="0.6" stroke-width="1.8" '
                        f'stroke-linecap="round" stroke-linejoin="round"/>')
     return out
 
