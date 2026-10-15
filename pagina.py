@@ -122,14 +122,13 @@ def mappa(titolo, sit, code_waze=(), numeri=(), sottotitolo=""):
         if x is None:
             continue
         y0 = Y_PASSO if sul_passo else Y_GALLERIA
-        largo = max(6, float(c.get("lunghezza_m") or 0) / 1000 * 11.6)
+        # Alla scala della mappa (~11,6 punti per km) una coda di 1-2 km sarebbe invisibile sul telefono: larghezza minima 18.
+        largo = max(18, float(c.get("lunghezza_m") or 0) / 1000 * 11.6)
         sensi = [_senso_waze(c.get("strada"))] if _senso_waze(c.get("strada")) else ["NS", "SN"]
         for senso in sensi:
             y = y0 + (CORSIA if senso == "SN" else 0)
-            o.append(f'<rect x="{x - largo / 2:.0f}" y="{y - 6}" width="{largo:.0f}" height="12" rx="3" '
-                     f'fill="{COLORI[LIVELLO_WAZE.get(int(c.get("livello") or 3), "🟠")]}" stroke="#202124" stroke-width="1.5"/>')
-        km = f'{float(c.get("lunghezza_m") or 0) / 1000:.1f}'.replace(".", ",")
-        o.append(f'<text x="{x:.0f}" y="{y0 + 2 * CORSIA + 12 if not sul_passo else y0 - 12}" text-anchor="middle" fill="#202124" font-size="10">Waze {km} km</text>')
+            o.append(f'<rect x="{x - largo / 2:.0f}" y="{y - 8}" width="{largo:.0f}" height="16" rx="4" '
+                     f'fill="{COLORI[LIVELLO_WAZE.get(int(c.get("livello") or 3), "🟠")]}" stroke="#202124" stroke-width="2"/>')
 
     y = 232
     for riga in numeri:
@@ -167,13 +166,35 @@ def numeri_fonte(riga, totali):
         out.append(f"Erstfeld–Biasca {testo}: " + "   |   ".join(parti))
     return out
 
+def elenco_waze(code, massimo=8):
+    """Una riga per coda, la più lunga prima: «Airolo, verso nord: coda 2,1 km a 8 km/h»."""
+    def km(c):
+        try:
+            return float(c.get("lunghezza_m") or 0)
+        except ValueError:
+            return 0.0
+    righe = []
+    for c in sorted(code, key=km, reverse=True)[:massimo]:
+        senso = {"NS": "verso sud", "SN": "verso nord"}.get(_senso_waze(c.get("strada")), "senso non indicato")
+        luogo = c.get("citta") or c.get("strada") or "luogo non indicato"
+        cosa = "chiusura" if "CLOSED" in str(c.get("sottotipo") or "") else "coda"
+        riga = f"{luogo}, {senso}: {cosa} {km(c) / 1000:.1f} km".replace(".", ",")
+        try:
+            if cosa == "coda" and c.get("velocita_kmh") not in (None, ""):
+                riga += f" a {round(float(c['velocita_kmh']))} km/h"
+        except ValueError:
+            pass
+        righe.append(riga)
+    return righe
+
 def mappa_fonte(fonte, quando, riga=None, totali=None, code_waze=None, ora_misura=None):
     etichetta = dict(FONTI_MAPPA)[fonte]
     titolo = f"{etichetta} — {quando:%H:%M}"
     sotto = f"misura delle {ora_misura}" if ora_misura and ora_misura != f"{quando:%Y-%m-%d %H:%M}" else ""
     if code_waze is not None:
         n = len(code_waze)
-        return mappa(titolo, None, code_waze, ["nessuna coda segnalata da Waze" if n == 0 else "1 coda segnalata da Waze" if n == 1 else f"{n} code segnalate da Waze"], sotto)
+        titolo_elenco = "nessuna coda segnalata da Waze" if n == 0 else "1 coda segnalata da Waze:" if n == 1 else f"{n} code segnalate da Waze:"
+        return mappa(titolo, None, code_waze, [titolo_elenco] + elenco_waze(code_waze), sotto)
     if riga is None:
         return mappa(titolo, {}, (), ["nessun dato in questo quarto d'ora"], sotto)
     return mappa(titolo, situazione({fonte: riga}, fonte), (), numeri_fonte(riga, totali), sotto)

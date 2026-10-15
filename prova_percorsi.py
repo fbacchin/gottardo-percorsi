@@ -200,9 +200,14 @@ def prova_mappe_per_fonte():
     assert "Google — 15:15" in svg and "misura delle 2026-10-18 15:00" in svg and "+12 min · totale 64 min" in svg and "#ff6f00" in svg
     assert "misura delle" not in mappa_fonte("apple", q, riga, ora_misura="2026-10-18 15:15")
     assert "nessun dato in questo quarto d'ora" in mappa_fonte("tomtom", q)
-    coda = {"strada": "A2 > Zürich", "lat": 46.50, "lon": 8.66, "lunghezza_m": 2100, "livello": 4}
-    w = mappa_fonte("apify", q, code_waze=[coda])
-    assert "1 coda segnalata da Waze" in w and "Waze 2,1 km" in w and "#c62828" in w
+    coda = {"strada": "A2 > Zürich", "citta": "Airolo", "lat": 46.50, "lon": 8.66, "lunghezza_m": 2100, "livello": 4, "velocita_kmh": "8.4"}
+    chiusa = {"strada": "A2 - E35", "citta": "Airolo", "lat": 46.5267, "lon": 8.6149, "lunghezza_m": 274, "livello": 5, "sottotipo": "ROAD_CLOSED"}
+    w = mappa_fonte("apify", q, code_waze=[chiusa, coda])
+    assert "2 code segnalate da Waze" in w and "#c62828" in w
+    assert "Airolo, verso nord: coda 2,1 km a 8 km/h" in w                     # elenco leggibile, la più lunga prima
+    assert "Airolo, senso non indicato: chiusura 0,3 km" in w
+    import re
+    assert all(int(x) >= 18 for x in re.findall(r'<rect x="[0-9.-]+" y="[0-9.-]+" width="([0-9]+)" height="16"', w))   # visibili anche sul telefono
     assert "nessuna coda segnalata da Waze" in mappa_fonte("openwebninja", q, code_waze=[])
 
 def prova_pagine_e_link():
