@@ -340,6 +340,19 @@ def prova_frecce_del_senso_di_marcia():
     assert any(abs(a) < 1 for a in angoli) and any(abs(abs(a) - 180) < 1 for a in angoli)       # verso sud → destra, verso nord → sinistra
     assert any(30 < a < 90 for a in angoli) and any(-90 < a < -30 for a in angoli)                # in discesa e in salita sui rami del passo
 
+def prova_quale_conviene():
+    """Richiesta dell'utente: in ogni mappa una riga che dica se conviene la galleria o il passo, con i totali di quella fonte."""
+    from pagina import conviene, mappa_fonte
+    from config import MISURE, ZURIGO
+    t = {"NS Erstfeld-Biasca tunnel": 50, "NS Erstfeld-Biasca passo": 71,
+         "SN Biasca-Erstfeld tunnel": 94, "SN Biasca-Erstfeld passo": 60}
+    assert conviene(t) == "Adesso conviene: verso sud la galleria (50 min contro 71 del passo) · verso nord il passo (60 min contro 94 della galleria)"
+    assert conviene({"NS Erstfeld-Biasca tunnel": 50, "NS Erstfeld-Biasca passo": 51, "SN Biasca-Erstfeld tunnel": 49}) == \
+        "Adesso conviene: verso sud fa lo stesso (galleria 50 min, passo 51 min) · verso nord non si può dire (manca il tempo del passo)"
+    assert conviene({}) == "Adesso conviene: verso sud non si può dire (manca il tempo della galleria) · verso nord non si può dire (manca il tempo della galleria)"
+    svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, t)
+    assert 'font-weight="600">Adesso conviene: verso sud la galleria' in svg
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0

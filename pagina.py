@@ -77,7 +77,7 @@ def _frecce(linea, al_contrario, passo=70):
     return out
 
 def mappa(titolo, sit, numeri=(), sottotitolo=""):
-    W, H = 1000, 250 + 16 * len(numeri)
+    W, H = 1000, 254 + 16 * len(numeri)
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
          f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="12">',
          f"<title>{titolo}</title>", f'<rect width="{W}" height="{H}" rx="8" fill="#ffffff"/>',
@@ -117,8 +117,12 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
 
     y = 232
     for riga in numeri:
-        o.append(f'<text x="16" y="{y}" fill="#3c4043" font-size="11">{riga}</text>')
-        y += 16
+        if riga.startswith("Adesso conviene"):                    # la risposta alla domanda «galleria o passo?» in evidenza
+            o.append(f'<text x="16" y="{y}" fill="#202124" font-size="12" font-weight="600">{riga}</text>')
+            y += 20
+        else:
+            o.append(f'<text x="16" y="{y}" fill="#3c4043" font-size="11">{riga}</text>')
+            y += 16
     x = 560                                                      # legenda in alto a destra
     for simbolo, testo in LEGENDA[:4]:
         o.append(f'<rect x="{x}" y="16" width="12" height="9" fill="{COLORI[simbolo]}"/>')
@@ -150,13 +154,28 @@ def numeri_fonte(riga, totali):
         out.append(f"Erstfeld–Biasca {testo}: " + "   |   ".join(parti))
     return out
 
+def conviene(totali):
+    """Galleria o passo, con i tempi totali di una fonte su Erstfeld–Biasca. Differenza di un minuto o meno: fa lo stesso."""
+    parti = []
+    for senso, testo in (("NS", "verso sud"), ("SN", "verso nord")):
+        g, p = (totali or {}).get(_nome(senso, "lunga", "tunnel")), (totali or {}).get(_nome(senso, "lunga", "passo"))
+        if g is None or p is None:
+            parti.append(f"{testo} non si può dire (manca il tempo {'della galleria' if g is None else 'del passo'})")
+        elif abs(g - p) <= 1:
+            parti.append(f"{testo} fa lo stesso (galleria {g} min, passo {p} min)")
+        elif g < p:
+            parti.append(f"{testo} la galleria ({g} min contro {p} del passo)")
+        else:
+            parti.append(f"{testo} il passo ({p} min contro {g} della galleria)")
+    return "Adesso conviene: " + " · ".join(parti)
+
 def mappa_fonte(fonte, quando, riga=None, totali=None, ora_misura=None):
     etichetta = dict(FONTI_MAPPA)[fonte]
     titolo = f"{etichetta} — {quando:%H:%M}"
     sotto = f"misura delle {ora_misura}" if ora_misura and ora_misura != f"{quando:%Y-%m-%d %H:%M}" else ""
     if riga is None:
         return mappa(titolo, {}, ["nessun dato in questo quarto d'ora"], sotto)
-    return mappa(titolo, situazione({fonte: riga}, fonte), numeri_fonte(riga, totali), sotto)
+    return mappa(titolo, situazione({fonte: riga}, fonte), [conviene(totali)] + numeri_fonte(riga, totali), sotto)
 
 def pagine(adesso, esiste):
     """{percorso: testo markdown} per il README e le pagine storia/<minuti>.md; esiste(percorso) dice se una mappa c'è."""
