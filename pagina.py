@@ -21,6 +21,7 @@ X = {"Erstfeld": 110, "Amsteg": 230, "Göschenen": 370, "Airolo": 680, "Faido": 
 Y_GALLERIA, Y_PASSO, CORSIA = 190, 96, 14            # y della corsia «verso sud»; quella «verso nord» è CORSIA più in basso
 CURVA = 110                                          # larghezza delle curve agli svincoli: più stretta e la corsia interna si accartoccia
 X_ANDERMATT, X_VETTA = 450, 525
+TRATTEGGIO = 66                                      # tratto di strada dritta coperto dalle curve a ogni svincolo
 
 def _y_ramo(x):
     """Quota del ramo del passo: sale con una curva morbida (smoothstep) da Göschenen, scende allo stesso modo su Airolo."""
@@ -140,6 +141,12 @@ def mappa(titolo, sit, numeri=(), sottotitolo=""):
         frazioni = (margine + 0.02, 1 - margine - 0.02) if (a, b) == ("Göschenen", "Airolo") else None
         corsie([(X[a], Y_GALLERIA), (X[b], Y_GALLERIA)], 0, ("NS", chiave), ("SN", chiave), frazioni=frazioni)
     corsie(_ramo_passo(), 0, ("NS", "passo"), ("SN", "passo"), "corsia-passo", (0.19, 0.5, 0.81), cavalcavia=True)
+    # Agli svincoli le curve coprono la strada dritta: un tratteggio grigio scuro (fuori dai colori delle code)
+    # ne mostra la continuazione fino alla galleria, su tutte e due le corsie.
+    for x0, x1 in ((X["Göschenen"], X["Göschenen"] + TRATTEGGIO), (X["Airolo"] - TRATTEGGIO, X["Airolo"])):
+        for y in (Y_GALLERIA, Y_GALLERIA + CORSIA):
+            o.append(f'<line class="continua" x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" stroke="#3c4043" stroke-width="3" '
+                     f'stroke-dasharray="6 4" stroke-linecap="butt"/>')
     o.extend(frecce)
     sotto_strada = Y_GALLERIA + CORSIA + 24                       # nomi sotto la strada principale: sopra c'è il passo
     o.append(f'<text x="{(X["Göschenen"] + X["Airolo"]) / 2:.0f}" y="{sotto_strada}" text-anchor="middle" fill="#202124" font-size="11" font-weight="600">Galleria 17 km</text>')

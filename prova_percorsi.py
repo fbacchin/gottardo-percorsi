@@ -377,6 +377,17 @@ def prova_frecce_fuori_dalle_curve():
         assert not [x for x in sulla_strada if x0 - 5 < x < x1 + 5], (x0, x1)
     assert len([x for x in sulla_strada if X["Göschenen"] < x < X["Airolo"]]) >= 2 * 2   # in galleria restano frecce in tutti e due i sensi
 
+def prova_tratteggio_strada_agli_svincoli():
+    """Richiesta dell'utente: dove le curve del passo coprono la strada dritta, un tratteggio ne mostra la continuazione verso la galleria."""
+    import re
+    from pagina import mappa_fonte, X, Y_GALLERIA, CORSIA
+    from config import MISURE, ZURIGO
+    svg = mappa_fonte("apple", datetime(2026, 10, 18, 15, 0, tzinfo=ZURIGO), {m[0]: "0" for m in MISURE}, {})
+    linee = re.findall(r'<line class="continua" x1="([0-9.]+)" y1="([0-9.]+)" x2="([0-9.]+)" y2="([0-9.]+)"[^>]*stroke-dasharray', svg)
+    assert len(linee) == 4                                                        # 2 svincoli × 2 corsie
+    assert {round(float(y)) for _, y, _, _ in linee} == {Y_GALLERIA, Y_GALLERIA + CORSIA}
+    assert svg.index('class="continua"') > svg.index('class="corsia-passo"')       # sopra le curve, altrimenti non si vede
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
