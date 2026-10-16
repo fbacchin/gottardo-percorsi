@@ -174,7 +174,7 @@ const TRATTE_PAGINA = `<!doctype html>
 </div></header>
 <p class="nota" style="padding-top:12px"><a href="/">← Mappe</a></p>
 <main id="tratte"></main>
-<p class="nota">Tempo con traffico; sotto, il ritardo rispetto alla strada libera secondo la fonte. «Passo − galleria» = minuti in più passando dal passo (negativo: il passo è più rapido). Google misura una volta all'ora: si mostra la sua ultima misura, con l'ora. «Percorso diverso» = la fonte ha calcolato un'altra strada, i km lo dicono.</p>
+<p class="nota">Tempo con traffico; sotto, il ritardo rispetto alla strada libera secondo la fonte. «Passo − galleria» = minuti in più passando dal passo (negativo: il passo è più rapido). Google misura una volta all'ora: si mostra la sua ultima misura, con l'ora; Göschenen–Airolo non la misura. «Percorso diverso» = la fonte ha calcolato un'altra strada, i km lo dicono.</p>
 <script>
   const COLORI = [[3, "#2fb350"], [10, "#ffcc00"], [40, "#ff6f00"]];
   const colore = (v) => (COLORI.find(([s]) => v < s) || [0, "#c62828"])[1];

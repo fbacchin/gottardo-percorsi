@@ -23,7 +23,7 @@ INTESTAZIONE = ["ora"] + [m[0] for m in MISURE] + ["esito"]
 
 def riga_sintetica(ora, risultati):
     per_nome = {r["misura"]: r for r in risultati}
-    valori = [ritardo_min(per_nome[m[0]]) for m in MISURE]
+    valori = [ritardo_min(per_nome[m[0]]) if m[0] in per_nome else None for m in MISURE]   # misura che la fonte non fa: cella vuota
     problemi = [f'{r["misura"]}: {r["esito"]}' for r in risultati if r["esito"] != "ok"]
     return [ora] + ["" if v is None else v for v in valori] + ["; ".join(problemi) or "ok"]
 
@@ -41,7 +41,10 @@ def aggiungi_in_cima(percorso, intestazione, righe):
     vecchie = []
     if os.path.exists(percorso):
         with open(percorso, newline="", encoding="utf-8") as f:
-            vecchie = list(csv.reader(f))[1:]
+            r = csv.reader(f)
+            testa = next(r, intestazione)
+            # Colonne nuove (16.10, Göschenen–Airolo): le righe vecchie si riallineano per nome, le celle mancanti restano vuote.
+            vecchie = [row if testa == intestazione else [dict(zip(testa, row)).get(c, "") for c in intestazione] for row in r]
     os.makedirs(os.path.dirname(percorso) or ".", exist_ok=True)
     with open(percorso, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)

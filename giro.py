@@ -6,20 +6,20 @@ from datetime import datetime, timedelta, timezone
 import fonti
 from archivio import (INTESTAZIONE, INTESTAZIONE_DETTAGLIO, aggiungi_in_cima, consenti, controlla_distanza, file_mese,
                       registra, riga_sintetica, righe_dettaglio, risultato, ultime_24h, ultimi_totali)
-from config import MISURE, ORARIE, PUBBLICHE, ZURIGO
+from config import ORARIE, PUBBLICHE, ZURIGO, misure
 from pagina import PASSI_STORIA, mappa_fonte, nome_mappa, pagine
 
 CHIAVI = {"apple": "APPLE_MAPS_PRIVATE_KEY", "tomtom": "TOMTOM_KEY", "google": "GOOGLE_ROUTES_KEY"}   # Waze tolto il 15.10
 
-def _tutte(esito):
-    return [risultato(m[0], esito=esito) for m in MISURE]
+def _tutte(fonte, esito):
+    return [risultato(m[0], esito=esito) for m in misure(fonte)]
 
-def _sicura(funzione):
+def _sicura(fonte, funzione):
     """Un'eccezione diventa un esito col solo nome: il messaggio potrebbe contenere l'URL con la chiave."""
     try:
         return funzione()
     except Exception as e:
-        return _tutte(f"errore {type(e).__name__}")
+        return _tutte(fonte, f"errore {type(e).__name__}")
 
 def _totali(rs):
     return {r["misura"]: round(r["con_traffico_s"] / 60) for r in rs if r["esito"] == "ok"}
@@ -48,9 +48,9 @@ def giro(adesso, env, pubblico, privato, chiama=fonti.http):
         try:
             if consenti(uso, fonte, richieste, quarto):
                 conta(fonte, richieste)
-                rs = [controlla_distanza(r) for r in _sicura(funzione)]
+                rs = [controlla_distanza(r) for r in _sicura(fonte, funzione)]
             else:
-                rs = _tutte("quota esaurita")
+                rs = _tutte(fonte, "quota esaurita")
             aggiungi_in_cima(file_mese(cartella(fonte), fonte, quarto), INTESTAZIONE, [riga_sintetica(ora, rs)])
             aggiungi_in_cima(file_mese(cartella(fonte), fonte, quarto, "-dettaglio"), INTESTAZIONE_DETTAGLIO, righe_dettaglio(ora, ora_utc, rs))
             misurate[fonte] = rs
@@ -60,11 +60,11 @@ def giro(adesso, env, pubblico, privato, chiama=fonti.http):
 
     def apple():
         token = fonti.token_apple(env["APPLE_MAPS_KEY_ID"], env["APPLE_TEAM_ID"], env["APPLE_MAPS_PRIVATE_KEY"], chiama)
-        return fonti.apple(token, chiama) if token else _tutte("errore token")
+        return fonti.apple(token, chiama) if token else _tutte("apple", "errore token")
 
     percorsi("apple", len(fonti.richieste_apple()), apple)
-    percorsi("tomtom", len(MISURE), lambda: fonti.tomtom(env["TOMTOM_KEY"], chiama))
-    percorsi("google", len(MISURE), lambda: fonti.google(env["GOOGLE_ROUTES_KEY"], chiama))
+    percorsi("tomtom", len(misure("tomtom")), lambda: fonti.tomtom(env["TOMTOM_KEY"], chiama))
+    percorsi("google", len(misure("google")), lambda: fonti.google(env["GOOGLE_ROUTES_KEY"], chiama))
 
     json.dump(uso, open(p_uso, "w"), indent=1, sort_keys=True)
 

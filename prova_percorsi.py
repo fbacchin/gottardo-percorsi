@@ -4,7 +4,7 @@ import sys, traceback
 
 def prova_misure():
     from config import MISURE, PUNTI, VALICO
-    assert len(MISURE) == 8 and len({m[0] for m in MISURE}) == 8
+    assert len(MISURE) == 12 and len({m[0] for m in MISURE}) == 12
     for nome, o, d, percorso in MISURE:
         assert o in PUNTI and d in PUNTI and percorso in ("tunnel", "passo")
         assert nome.startswith("NS " if PUNTI[o][0] > PUNTI[d][0] else "SN ")   # nord = latitudine maggiore
@@ -80,7 +80,7 @@ def prova_pem_su_una_riga():
 def prova_apple_coppie():
     from fonti import richieste_apple
     r = richieste_apple()
-    assert len(r) == 9 and sum(len(d) for _, d in r) == 12 and all(len(d) <= 10 for _, d in r)
+    assert len(r) == 13 and sum(len(d) for _, d in r) == 18 and all(len(d) <= 10 for _, d in r)   # 16.10: con Göschenen–Airolo
 
 def prova_apple_campione():
     from fonti import apple
@@ -124,10 +124,25 @@ def prova_google_campioni():
     assert da_google("c", 429, None)["esito"] == "errore 429"
 
 def prova_google_otto_misure():
+    """Google resta a 8 misure: niente Göschenen–Airolo (decisione dell'utente, 16.10)."""
     from fonti import google
     from config import MISURE
     rs = google("k", lambda *a, **k: (500, None))
-    assert [r["misura"] for r in rs] == [m[0] for m in MISURE] and all(r["esito"] == "errore 500" for r in rs)
+    assert [r["misura"] for r in rs] == [m[0] for m in MISURE[:8]] and all(r["esito"] == "errore 500" for r in rs)
+
+def prova_colonne_nuove_nei_csv():
+    """16.10: quattro colonne nuove in coda. Le righe vecchie si riallineano per nome; Google lascia vuote le sue."""
+    from archivio import INTESTAZIONE, aggiungi_in_cima, riga_sintetica, risultato
+    from config import MISURE
+    d = tempfile.mkdtemp(); p = os.path.join(d, "x.csv")
+    vecchia = ["ora"] + [m[0] for m in MISURE[:8]] + ["esito"]
+    aggiungi_in_cima(p, vecchia, [["2026-10-16 12:00"] + ["1"] * 8 + ["ok"]])
+    nuova = riga_sintetica("2026-10-16 13:00", [risultato(m[0], 120, 60, 1) for m in MISURE[:8]])
+    aggiungi_in_cima(p, INTESTAZIONE, [nuova])
+    righe = list(csv.DictReader(open(p)))
+    assert [r["ora"] for r in righe] == ["2026-10-16 13:00", "2026-10-16 12:00"]
+    assert righe[1]["esito"] == "ok" and righe[1][MISURE[0][0]] == "1" and righe[1][MISURE[11][0]] == ""
+    assert righe[0]["esito"] == "ok" and righe[0][MISURE[0][0]] == "1" and righe[0][MISURE[8][0]] == ""
 
 def prova_pallini():
     from pagina import pallino
@@ -276,7 +291,7 @@ def prova_tomtom_429_si_riprova():
         chiamate.append(url)
         return (429, None) if len(chiamate) in (5, 6) else (c["codice"], c["risposta"])
     rs = tomtom("k", chiama, attesa=pause.append)
-    assert all(r["esito"] == "ok" for r in rs) and len(chiamate) == 10       # due 429 riprovati
+    assert all(r["esito"] == "ok" for r in rs) and len(chiamate) == len(rs) + 2   # due 429 riprovati
     assert pause and all(p > 0 for p in pause)
     sempre = tomtom("k", lambda *a, **k: (429, None), attesa=lambda s: None)
     assert all(r["esito"] == "errore 429" for r in sempre)                 # dopo i tentativi si arrende, senza inventare

@@ -1,6 +1,6 @@
 # Chiamate alle fonti. Mai un URL o una risposta grezza nei messaggi: contengono chiavi.
 import base64, json, time, urllib.error, urllib.request
-from config import MISURE, PUNTI, VALICO
+from config import PUNTI, VALICO, misure
 from archivio import risultato
 
 def http(metodo, url, intestazioni=None, corpo=None):
@@ -57,7 +57,7 @@ def richieste_apple():
     """(origine, destinazioni) per le otto misure. Le tratte che toccano il valico vanno in richieste a sé:
     col passo chiuso Apple potrebbe rifiutare l'intera richiesta, e si perderebbero anche le misure della galleria."""
     tunnel, salite, discese = {}, set(), []
-    for _, o, d, percorso in MISURE:
+    for _, o, d, percorso in misure("apple"):
         if percorso == "tunnel":
             tunnel.setdefault(o, []).append(d)
         else:
@@ -82,7 +82,7 @@ def apple(token, chiama=http):
             e = next((e for e in r.get("etas", []) if _vicino((e["destination"]["latitude"], e["destination"]["longitude"]), PUNTI[d])), None)
             tratte[(o, d)] = (risultato("", e["expectedTravelTimeSeconds"], e["staticTravelTimeSeconds"], e["distanceMeters"])
                               if e else risultato("", esito="percorso non trovato"))
-    return [componi(nome, o, d, p, tratte) for nome, o, d, p in MISURE]
+    return [componi(nome, o, d, p, tratte) for nome, o, d, p in misure("apple")]
 
 def _luogo(tappe):
     return ":".join("%s,%s" % PUNTI[t] for t in tappe)
@@ -100,7 +100,7 @@ def tomtom(chiave, chiama=http, attesa=time.sleep):
     Il piano gratuito rifiuta con 429 le richieste troppo ravvicinate (15.10.2026: le ultime 3 di 8):
     si lascia una pausa tra le richieste e dopo un 429 si riprova, al massimo due volte."""
     out = []
-    for nome, o, d, percorso in MISURE:
+    for nome, o, d, percorso in misure("tomtom"):
         tappe = [o, VALICO, d] if percorso == "passo" else [o, d]
         for tentativo in range(3):
             attesa(0.3 if tentativo == 0 else 1.5)
@@ -125,7 +125,7 @@ def da_google(nome, codice, r):
 def google(chiave, chiama=http):
     """Chiave nell'intestazione, mai nell'URL. Il passo con il punto del valico come tappa obbligata (via)."""
     out = []
-    for nome, o, d, percorso in MISURE:
+    for nome, o, d, percorso in misure("google"):
         corpo = {"origin": _punto(o), "destination": _punto(d), "travelMode": "DRIVE", "routingPreference": "TRAFFIC_AWARE"}
         if percorso == "passo":
             corpo["intermediates"] = [{**_punto(VALICO), "via": True}]

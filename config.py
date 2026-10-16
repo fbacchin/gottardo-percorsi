@@ -11,6 +11,9 @@ PUNTI = {
     "Faido":    (46.46584, 8.82325),
     "Biasca":   (46.35530, 8.96100),   # strada locale a est dello svincolo: sulla rampa Apple lo agganciava alla carreggiata verso sud (Biasca→Faido 52,8 km)
     "Passo":    (46.55880, 8.56210),
+    # Göschenen–Airolo aggiunta il 16.10 (richiesta dell'utente). Punti provati con Apple e TomTom: Erstfeld↔Göschenen torna uguale nei due sensi.
+    "Göschenen": (46.67062, 8.59251),  # strada 2 (Umfahrungsstrasse) appena a sud della rotonda dello svincolo
+    "Airolo":    (46.52499, 8.60348),  # strada a doppio senso a ovest della rotonda dello svincolo: sul raccordo a senso unico TomTom faceva il giro del paese
 }
 VALICO = "Passo"   # punto obbligato del percorso «passo»
 
@@ -24,7 +27,18 @@ MISURE = [   # prima i percorsi col tunnel, poi quelli sul passo (richiesta dell
     ("SN Biasca-Erstfeld passo",  "Biasca", "Erstfeld", "passo"),
     ("NS Amsteg-Faido passo",     "Amsteg", "Faido", "passo"),
     ("SN Faido-Amsteg passo",     "Faido", "Amsteg", "passo"),
+    # In coda e non in mezzo: le colonne dei CSV già scritti restano al loro posto.
+    ("NS Göschenen-Airolo tunnel", "Göschenen", "Airolo", "tunnel"),
+    ("SN Airolo-Göschenen tunnel", "Airolo", "Göschenen", "tunnel"),
+    ("NS Göschenen-Airolo passo",  "Göschenen", "Airolo", "passo"),
+    ("SN Airolo-Göschenen passo",  "Airolo", "Göschenen", "passo"),
 ]
+
+# Misure che una fonte non fa. Google resta a 8 chiamate l'ora (decisione dell'utente, 16.10): niente Göschenen–Airolo.
+NON_MISURATE = {"google": {m[0] for m in MISURE if "Göschenen" in m[0]}}
+
+def misure(fonte):
+    return [m for m in MISURE if m[0] not in NON_MISURATE.get(fonte, ())]
 
 # Fonti i cui dati possono stare nel repository pubblico. Vuoto: Apple vieta di pubblicare i suoi dati,
 # le condizioni di TomTom non sono verificate (Doc/ADEV-773/preliminari.md).
@@ -47,5 +61,9 @@ RIFERIMENTI_M = {   # Apple Maps, giro del 15.10.2026 17:30 (Google entro il 5 %
     "NS Amsteg-Faido tunnel": 50000,    "SN Faido-Amsteg tunnel": 49800,
     "NS Erstfeld-Biasca passo": 90000,  "SN Biasca-Erstfeld passo": 90600,
     "NS Amsteg-Faido passo": 64600,     "SN Faido-Amsteg passo": 64400,
+    # Göschenen–Airolo, 16.10 12:45. Galleria NS a metà tra Apple (19,3 km) e TomTom (20,7 km): su una tratta corta 1,4 km sono il 7 %.
+    # TomTom da Airolo verso nord sceglie il passo anche senza traffico (31,6 km): per TomTom quella galleria risulta «percorso diverso».
+    "NS Göschenen-Airolo tunnel": 20000, "SN Airolo-Göschenen tunnel": 20300,
+    "NS Göschenen-Airolo passo": 31800,  "SN Airolo-Göschenen passo": 31600,
 }
 TOLLERANZA = 0.05

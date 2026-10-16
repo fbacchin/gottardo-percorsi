@@ -37,12 +37,13 @@ export function quanto(indice) {
 export const TRATTE = [
   ["Erstfeld → Biasca", "verso sud", "NS Erstfeld-Biasca"], ["Biasca → Erstfeld", "verso nord", "SN Biasca-Erstfeld"],
   ["Amsteg → Faido", "verso sud", "NS Amsteg-Faido"], ["Faido → Amsteg", "verso nord", "SN Faido-Amsteg"],
+  ["Göschenen → Airolo", "verso sud", "NS Göschenen-Airolo"], ["Airolo → Göschenen", "verso nord", "SN Airolo-Göschenen"],   // 16.10, Google non la misura
 ];
 const ORARIE = new Set(["google"]);   // come config.ORARIE: misurano solo al minuto :00
 const COLONNE = ["ora", "ora_utc", "misura", "con_traffico_s", "senza_traffico_s", "distanza_m", "esito"];
 
 // CSV di dettaglio → righe; si leggono solo le prime `quante` (le più recenti stanno in cima).
-export function leggiDettaglio(testo, quante = 1 + 8 * 16) {
+export function leggiDettaglio(testo, quante = 1 + 12 * 16) {
   return testo.split("\n", quante).slice(1).map((riga) => {
     const campi = []; let c = "", virgolette = false;
     for (const ch of riga.replace(/\r$/, "")) {

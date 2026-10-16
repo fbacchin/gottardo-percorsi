@@ -31,6 +31,7 @@ const t = tabelle({ apple, google });
 assert.deepEqual(t.map((x) => x.quando), ["2026-10-15 22:30", "2026-10-15 22:15", "2026-10-15 22:00", "2026-10-15 21:00"]);
 const eb = t[0].tratte[0];
 assert.equal(eb.nome, "Erstfeld → Biasca");
+assert.equal(t[0].tratte.length, 6);
 assert.deepEqual(eb.fonti.apple.galleria, { esito: "ok", totale: 49, ritardo: 1, km: 75 });
 assert.deepEqual(eb.fonti.apple.passo, { esito: "ok", totale: 72, ritardo: 5, km: 90 });
 assert.equal(eb.fonti.apple.differenza, 23);
