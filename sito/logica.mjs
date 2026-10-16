@@ -31,3 +31,59 @@ export function quanto(indice) {
   const h = Math.floor(min / 60), r = min % 60;
   return r ? `${h} h ${r} min fa` : `${h} h fa`;
 }
+
+// --- Tabella delle tratte: galleria e passo a confronto, per fonte ---
+
+export const TRATTE = [
+  ["Erstfeld → Biasca", "verso sud", "NS Erstfeld-Biasca"], ["Biasca → Erstfeld", "verso nord", "SN Biasca-Erstfeld"],
+  ["Amsteg → Faido", "verso sud", "NS Amsteg-Faido"], ["Faido → Amsteg", "verso nord", "SN Faido-Amsteg"],
+];
+const ORARIE = new Set(["google"]);   // come config.ORARIE: misurano solo al minuto :00
+const COLONNE = ["ora", "ora_utc", "misura", "con_traffico_s", "senza_traffico_s", "distanza_m", "esito"];
+
+// CSV di dettaglio → righe; si leggono solo le prime `quante` (le più recenti stanno in cima).
+export function leggiDettaglio(testo, quante = 1 + 8 * 16) {
+  return testo.split("\n", quante).slice(1).map((riga) => {
+    const campi = []; let c = "", virgolette = false;
+    for (const ch of riga.replace(/\r$/, "")) {
+      if (ch === '"') virgolette = !virgolette;
+      else if (ch === "," && !virgolette) { campi.push(c); c = ""; }
+      else c += ch;
+    }
+    campi.push(c);
+    return campi.length === COLONNE.length ? Object.fromEntries(COLONNE.map((k, i) => [k, campi[i]])) : null;
+  }).filter(Boolean);
+}
+
+const minuti = (ora) => Date.parse(ora.replace(" ", "T") + ":00Z") / 60000;
+
+function cella(r) {
+  if (!r) return null;
+  const km = Math.round(Number(r.distanza_m) / 1000);
+  if (r.esito !== "ok") return { esito: r.esito, km: r.distanza_m ? km : null };
+  return { esito: "ok", totale: Math.round(r.con_traffico_s / 60), ritardo: Math.round((r.con_traffico_s - r.senza_traffico_s) / 60), km };
+}
+
+// { fonte: righe } → ultimi `n` quarti d'ora, dal più recente, con galleria, passo e differenza per tratta e fonte.
+// Le fonti orarie mostrano l'ultima misura dell'ora (con la sua ora), le altre solo la misura di quel quarto d'ora.
+export function tabelle(perFonte, n = 12) {
+  const ore = [...new Set(Object.values(perFonte).flat().map((r) => r.ora))].sort().reverse().slice(0, n);
+  return ore.map((quando, i) => {
+    const misura = {};
+    for (const [fonte, righe] of Object.entries(perFonte)) {
+      const valide = righe.filter((r) => r.ora === quando || (ORARIE.has(fonte) && r.ora < quando && minuti(quando) - minuti(r.ora) < 60));
+      const ultima = valide.map((r) => r.ora).sort().pop();
+      misura[fonte] = { ora: ultima || null, righe: valide.filter((r) => r.ora === ultima) };
+    }
+    const tratte = TRATTE.map(([nome, senso, chiave]) => ({
+      nome, senso,
+      fonti: Object.fromEntries(Object.entries(misura).map(([fonte, m]) => {
+        const galleria = cella(m.righe.find((r) => r.misura === chiave + " tunnel"));
+        const passo = cella(m.righe.find((r) => r.misura === chiave + " passo"));
+        const differenza = galleria?.esito === "ok" && passo?.esito === "ok" ? passo.totale - galleria.totale : null;
+        return [fonte, { ora: m.ora, galleria, passo, differenza }];
+      })),
+    }));
+    return { quando, quanto: quanto(i), tratte };
+  });
+}
