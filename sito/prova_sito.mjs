@@ -32,6 +32,8 @@ assert.deepEqual(t.map((x) => x.quando), ["2026-10-15 22:30", "2026-10-15 22:15"
 const eb = t[0].tratte[0];
 assert.equal(eb.nome, "Erstfeld → Biasca");
 assert.equal(t[0].tratte.length, 6);
+assert.deepEqual(t[0].separate.map((g) => g.righe.length), [4, 4]);
+assert.equal(t[0].separate[0].righe[0].fonti.apple.cella, null);            // nessuna riga di Erstfeld–Amsteg nel campione
 assert.deepEqual(eb.fonti.apple.galleria, { esito: "ok", totale: 49, ritardo: 1, km: 75 });
 assert.deepEqual(eb.fonti.apple.passo, { esito: "ok", totale: 72, ritardo: 5, km: 90 });
 assert.equal(eb.fonti.apple.differenza, 23);
@@ -40,4 +42,7 @@ assert.deepEqual(eb.fonti.google.passo, { esito: "percorso diverso", km: 106 });
 assert.equal(eb.fonti.google.differenza, null);
 assert.equal(t[1].tratte[0].fonti.apple.passo, null);                      // nessuna riga: cella vuota
 assert.equal(t[3].tratte[0].fonti.apple.ora, null);                        // Apple non c'era alle 21:00
+const sep = tabelle({ apple: leggiDettaglio(intestazione + "2026-10-16 20:00,2026-10-16T18:00Z,SN Faido-Airolo,900,780,18964,ok\n") });
+assert.equal(sep[0].separate[1].righe[1].nome, "Faido → Airolo");
+assert.deepEqual(sep[0].separate[1].righe[1].fonti.apple.cella, { esito: "ok", totale: 15, ritardo: 2, km: 19 });
 console.log("prove della tabella: ok");

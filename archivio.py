@@ -1,7 +1,7 @@
 # Ritardi, esiti e file CSV. Righe più recenti in cima, subito sotto l'intestazione.
 import csv, os
 from datetime import timedelta
-from config import MISURE, RIFERIMENTI_M, TOLLERANZA
+from config import MISURE, RIFERIMENTI_M, TOLLERANZA, TOLLERANZA_MIN_M
 
 def risultato(misura, con=None, senza=None, distanza=None, esito="ok"):
     return {"misura": misura, "con_traffico_s": con, "senza_traffico_s": senza, "distanza_m": distanza, "esito": esito}
@@ -15,7 +15,7 @@ def ritardo_min(r):
 def controlla_distanza(r, riferimenti=RIFERIMENTI_M, tolleranza=TOLLERANZA):
     """Distanza lontana dal riferimento = la fonte ha calcolato un'altra strada (tunnel o passo chiusi)."""
     rif = riferimenti.get(r["misura"])
-    if r["esito"] == "ok" and rif and abs(r["distanza_m"] - rif) / rif > tolleranza:
+    if r["esito"] == "ok" and rif and abs(r["distanza_m"] - rif) > max(rif * tolleranza, TOLLERANZA_MIN_M):
         return {**r, "esito": "percorso diverso"}
     return r
 

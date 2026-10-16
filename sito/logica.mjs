@@ -37,13 +37,18 @@ export function quanto(indice) {
 export const TRATTE = [
   ["Erstfeld → Biasca", "verso sud", "NS Erstfeld-Biasca"], ["Biasca → Erstfeld", "verso nord", "SN Biasca-Erstfeld"],
   ["Amsteg → Faido", "verso sud", "NS Amsteg-Faido"], ["Faido → Amsteg", "verso nord", "SN Faido-Amsteg"],
-  ["Göschenen → Airolo", "verso sud", "NS Göschenen-Airolo"], ["Airolo → Göschenen", "verso nord", "SN Airolo-Göschenen"],   // 16.10, Google non la misura
+  ["Göschenen → Airolo", "verso sud", "NS Göschenen-Airolo"], ["Airolo → Göschenen", "verso nord", "SN Airolo-Göschenen"],
+];
+// Tratte separate (16.10): una sola strada, in ordine di marcia.
+export const SEPARATE = [
+  ["verso sud", [["Erstfeld → Amsteg", "NS Erstfeld-Amsteg"], ["Amsteg → Göschenen", "NS Amsteg-Göschenen"], ["Airolo → Faido", "NS Airolo-Faido"], ["Faido → Biasca", "NS Faido-Biasca"]]],
+  ["verso nord", [["Biasca → Faido", "SN Biasca-Faido"], ["Faido → Airolo", "SN Faido-Airolo"], ["Göschenen → Amsteg", "SN Göschenen-Amsteg"], ["Amsteg → Erstfeld", "SN Amsteg-Erstfeld"]]],
 ];
 const ORARIE = new Set(["google"]);   // come config.ORARIE: misurano solo al minuto :00
 const COLONNE = ["ora", "ora_utc", "misura", "con_traffico_s", "senza_traffico_s", "distanza_m", "esito"];
 
 // CSV di dettaglio → righe; si leggono solo le prime `quante` (le più recenti stanno in cima).
-export function leggiDettaglio(testo, quante = 1 + 12 * 16) {
+export function leggiDettaglio(testo, quante = 1 + 20 * 16) {
   return testo.split("\n", quante).slice(1).map((riga) => {
     const campi = []; let c = "", virgolette = false;
     for (const ch of riga.replace(/\r$/, "")) {
@@ -85,6 +90,12 @@ export function tabelle(perFonte, n = 12) {
         return [fonte, { ora: m.ora, galleria, passo, differenza }];
       })),
     }));
-    return { quando, quanto: quanto(i), tratte };
+    const separate = SEPARATE.map(([senso, elenco]) => ({
+      senso,
+      righe: elenco.map(([nome, chiave]) => ({
+        nome, fonti: Object.fromEntries(Object.entries(misura).map(([fonte, m]) => [fonte, { ora: m.ora, cella: cella(m.righe.find((r) => r.misura === chiave)) }])),
+      })),
+    }));
+    return { quando, quanto: quanto(i), tratte, separate };
   });
 }

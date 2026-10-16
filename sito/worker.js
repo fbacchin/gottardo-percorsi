@@ -174,7 +174,7 @@ const TRATTE_PAGINA = `<!doctype html>
 </div></header>
 <p class="nota" style="padding-top:12px"><a href="/">← Mappe</a></p>
 <main id="tratte"></main>
-<p class="nota">Tempo con traffico; sotto, il ritardo rispetto alla strada libera secondo la fonte. «Passo − galleria» = minuti in più passando dal passo (negativo: il passo è più rapido). Google misura una volta all'ora: si mostra la sua ultima misura, con l'ora; Göschenen–Airolo non la misura. «Percorso diverso» = la fonte ha calcolato un'altra strada, i km lo dicono.</p>
+<p class="nota">Tempo con traffico; sotto, il ritardo rispetto alla strada libera secondo la fonte. «Passo − galleria» = minuti in più passando dal passo (negativo: il passo è più rapido). Google misura una volta all'ora, solo Amsteg–Faido e Göschenen–Airolo: si mostra la sua ultima misura, con l'ora. Le tratte separate hanno una sola strada, l'autostrada. «Percorso diverso» = la fonte ha calcolato un'altra strada, i km lo dicono.</p>
 <script>
   const COLORI = [[3, "#2fb350"], [10, "#ffcc00"], [40, "#ff6f00"]];
   const colore = (v) => (COLORI.find(([s]) => v < s) || [0, "#c62828"])[1];
@@ -219,6 +219,21 @@ const TRATTE_PAGINA = `<!doctype html>
           const d = t.fonti[f] && t.fonti[f].differenza;
           return d == null ? cella(null) : crea("td", (d > 0 ? "+" : "") + d + " min");
         }, "diff"));
+      tab.append(thead, tbody); s.append(tab);
+      return s;
+    }), ...m.separate.map((g) => {
+      // Solo le fonti che misurano queste tratte (Google no).
+      const colonne = fonti.filter(([f]) => g.righe.some((r) => r.fonti[f] && r.fonti[f].cella));
+      const s = crea("section"), h = crea("h2", "Tratte separate "); h.append(crea("span", g.senso)); s.append(h);
+      const tab = crea("table"), testa = crea("tr"); testa.append(crea("th"));
+      for (const [, nome] of colonne) testa.append(crea("th", nome));
+      const thead = crea("thead"); thead.append(testa);
+      const tbody = crea("tbody");
+      for (const r of g.righe) {
+        const tr = crea("tr"); tr.append(crea("th", r.nome));
+        for (const [f] of colonne) tr.append(cella(r.fonti[f] && r.fonti[f].cella));
+        tbody.append(tr);
+      }
       tab.append(thead, tbody); s.append(tab);
       return s;
     }));

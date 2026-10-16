@@ -13,7 +13,7 @@ PUNTI = {
     "Passo":    (46.55880, 8.56210),
     # Göschenen–Airolo aggiunta il 16.10 (richiesta dell'utente). Punti provati con Apple e TomTom: Erstfeld↔Göschenen torna uguale nei due sensi.
     "Göschenen": (46.67062, 8.59251),  # strada 2 (Umfahrungsstrasse) appena a sud della rotonda dello svincolo
-    "Airolo":    (46.52499, 8.60348),  # strada a doppio senso a ovest della rotonda dello svincolo: sul raccordo a senso unico TomTom faceva il giro del paese
+    "Airolo":    (46.52917, 8.60837),  # Via San Gottardo (strada 2) in paese. Vicino alla rotonda dello svincolo TomTom partiva male: Airolo→Faido 30 km, Airolo→Göschenen sul passo
 }
 VALICO = "Passo"   # punto obbligato del percorso «passo»
 
@@ -32,10 +32,16 @@ MISURE = [   # prima i percorsi col tunnel, poi quelli sul passo (richiesta dell
     ("SN Airolo-Göschenen tunnel", "Airolo", "Göschenen", "tunnel"),
     ("NS Göschenen-Airolo passo",  "Göschenen", "Airolo", "passo"),
     ("SN Airolo-Göschenen passo",  "Airolo", "Göschenen", "passo"),
+    # Tratte separate (16.10, richiesta dell'utente): una sola strada, l'A2.
+    ("NS Erstfeld-Amsteg",  "Erstfeld", "Amsteg", "diretto"),  ("SN Amsteg-Erstfeld",  "Amsteg", "Erstfeld", "diretto"),
+    ("NS Amsteg-Göschenen", "Amsteg", "Göschenen", "diretto"), ("SN Göschenen-Amsteg", "Göschenen", "Amsteg", "diretto"),
+    ("NS Airolo-Faido",     "Airolo", "Faido", "diretto"),     ("SN Faido-Airolo",     "Faido", "Airolo", "diretto"),
+    ("NS Faido-Biasca",     "Faido", "Biasca", "diretto"),     ("SN Biasca-Faido",     "Biasca", "Faido", "diretto"),
 ]
 
-# Misure che una fonte non fa. Google resta a 8 chiamate l'ora (decisione dell'utente, 16.10): niente Göschenen–Airolo.
-NON_MISURATE = {"google": {m[0] for m in MISURE if "Göschenen" in m[0]}}
+# Misure che una fonte non fa. Google resta a 8 chiamate l'ora (decisione dell'utente, 16.10):
+# Amsteg–Faido e Göschenen–Airolo, niente Erstfeld–Biasca né tratte separate.
+NON_MISURATE = {"google": {m[0] for m in MISURE if "Erstfeld-Biasca" in m[0] or "Biasca-Erstfeld" in m[0] or m[3] == "diretto"}}
 
 def misure(fonte):
     return [m for m in MISURE if m[0] not in NON_MISURATE.get(fonte, ())]
@@ -61,9 +67,12 @@ RIFERIMENTI_M = {   # Apple Maps, giro del 15.10.2026 17:30 (Google entro il 5 %
     "NS Amsteg-Faido tunnel": 50000,    "SN Faido-Amsteg tunnel": 49800,
     "NS Erstfeld-Biasca passo": 90000,  "SN Biasca-Erstfeld passo": 90600,
     "NS Amsteg-Faido passo": 64600,     "SN Faido-Amsteg passo": 64400,
-    # Göschenen–Airolo, 16.10 12:45. Galleria NS a metà tra Apple (19,3 km) e TomTom (20,7 km): su una tratta corta 1,4 km sono il 7 %.
-    # TomTom da Airolo verso nord sceglie il passo anche senza traffico (31,6 km): per TomTom quella galleria risulta «percorso diverso».
-    "NS Göschenen-Airolo tunnel": 20000, "SN Airolo-Göschenen tunnel": 20300,
-    "NS Göschenen-Airolo passo": 31800,  "SN Airolo-Göschenen passo": 31600,
+    # Göschenen–Airolo e tratte separate: Apple, 16.10 sera, punto di Airolo in paese. TomTom entro il 3 %, tranne Erstfeld–Amsteg (0,8 km in meno).
+    # Faido→Airolo: le due fonti insieme ora 19,0 ora 20,7 km (due accessi al paese): riferimento a metà.
+    "NS Göschenen-Airolo tunnel": 21000, "SN Airolo-Göschenen tunnel": 22250,
+    "NS Göschenen-Airolo passo": 31750,  "SN Airolo-Göschenen passo": 31850,
+    "NS Erstfeld-Amsteg": 8960,   "SN Amsteg-Erstfeld": 8870,   "NS Amsteg-Göschenen": 13900, "SN Göschenen-Amsteg": 13710,
+    "NS Airolo-Faido": 21050,     "SN Faido-Airolo": 19850,     "NS Faido-Biasca": 17930,     "SN Biasca-Faido": 18540,
 }
 TOLLERANZA = 0.05
+TOLLERANZA_MIN_M = 1000   # sulle tratte corte il 5 % è meno della differenza tra le fonti (Erstfeld–Amsteg: Apple 9,0 km, TomTom 8,2)

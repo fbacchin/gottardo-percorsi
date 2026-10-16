@@ -49,16 +49,16 @@ def unisci(nome, a, b):
                      a["distanza_m"] + b["distanza_m"])
 
 def componi(nome, origine, destinazione, percorso, tratte):
-    if percorso == "tunnel":
+    if percorso != "passo":
         return {**tratte[(origine, destinazione)], "misura": nome}
     return unisci(nome, tratte[(origine, VALICO)], tratte[(VALICO, destinazione)])
 
 def richieste_apple():
-    """(origine, destinazioni) per le otto misure. Le tratte che toccano il valico vanno in richieste a sé:
+    """(origine, destinazioni) per le misure di Apple. Le tratte che toccano il valico vanno in richieste a sé:
     col passo chiuso Apple potrebbe rifiutare l'intera richiesta, e si perderebbero anche le misure della galleria."""
     tunnel, salite, discese = {}, set(), []
     for _, o, d, percorso in misure("apple"):
-        if percorso == "tunnel":
+        if percorso != "passo":
             tunnel.setdefault(o, []).append(d)
         else:
             salite.add(o)

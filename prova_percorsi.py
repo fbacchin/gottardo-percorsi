@@ -4,9 +4,9 @@ import sys, traceback
 
 def prova_misure():
     from config import MISURE, PUNTI, VALICO
-    assert len(MISURE) == 12 and len({m[0] for m in MISURE}) == 12
+    assert len(MISURE) == 20 and len({m[0] for m in MISURE}) == 20
     for nome, o, d, percorso in MISURE:
-        assert o in PUNTI and d in PUNTI and percorso in ("tunnel", "passo")
+        assert o in PUNTI and d in PUNTI and percorso in ("tunnel", "passo", "diretto")
         assert nome.startswith("NS " if PUNTI[o][0] > PUNTI[d][0] else "SN ")   # nord = latitudine maggiore
     assert VALICO in PUNTI
 
@@ -80,7 +80,7 @@ def prova_pem_su_una_riga():
 def prova_apple_coppie():
     from fonti import richieste_apple
     r = richieste_apple()
-    assert len(r) == 13 and sum(len(d) for _, d in r) == 18 and all(len(d) <= 10 for _, d in r)   # 16.10: con Göschenen–Airolo
+    assert len(r) == 13 and sum(len(d) for _, d in r) == 26 and all(len(d) <= 10 for _, d in r)   # 16.10: con Göschenen–Airolo e le tratte separate
 
 def prova_apple_campione():
     from fonti import apple
@@ -124,11 +124,11 @@ def prova_google_campioni():
     assert da_google("c", 429, None)["esito"] == "errore 429"
 
 def prova_google_otto_misure():
-    """Google resta a 8 misure: niente Göschenen–Airolo (decisione dell'utente, 16.10)."""
+    """Google resta a 8 misure: Amsteg–Faido e Göschenen–Airolo, niente Erstfeld–Biasca (decisione dell'utente, 16.10)."""
     from fonti import google
-    from config import MISURE
     rs = google("k", lambda *a, **k: (500, None))
-    assert [r["misura"] for r in rs] == [m[0] for m in MISURE[:8]] and all(r["esito"] == "errore 500" for r in rs)
+    assert len(rs) == 8 and all(r["esito"] == "errore 500" for r in rs)
+    assert {r["misura"].split()[1] for r in rs} == {"Amsteg-Faido", "Faido-Amsteg", "Göschenen-Airolo", "Airolo-Göschenen"}
 
 def prova_colonne_nuove_nei_csv():
     """16.10: quattro colonne nuove in coda. Le righe vecchie si riallineano per nome; Google lascia vuote le sue."""
@@ -251,14 +251,15 @@ def prova_giro_orarie_tra_un_ora_e_l_altra():
     from config import ZURIGO
     c = _campione("privati/campioni/google-tunnel.json")
     def risposte(metodo, url, intestazioni=None, corpo=None):
-        if "googleapis" in url: return c["codice"], c["risposta"]
+        # Google non misura più Erstfeld–Biasca (16.10): il campione della galleria fatto passare per Amsteg–Faido (50 km)
+        if "googleapis" in url: return c["codice"], {**c["risposta"], "routes": [{**c["risposta"]["routes"][0], "distanceMeters": 50000}]}
         return 503, None
     d = tempfile.mkdtemp()
     env = {"GOOGLE_ROUTES_KEY": "g", "OPENWEBNINJA_KEY": "o"}
     _giro_finto(datetime(2026, 10, 16, 18, 0, tzinfo=ZURIGO), risposte, env, d)
     _, priv, _ = _giro_finto(datetime(2026, 10, 16, 18, 15, tzinfo=ZURIGO), risposte, env, d)
     g = open(f"{priv}/mappe/2026-10-16-1815-google.svg", encoding="utf-8").read()
-    assert "misura delle 2026-10-16 18:00" in g and "totale" in g
+    assert "misura delle 2026-10-16 18:00" in g and "totale" in g and "Amsteg–Faido" in g
     assert not glob.glob(f"{priv}/mappe/*-openwebninja.svg") and not glob.glob(f"{priv}/dati/waze-*")   # Waze: niente
     assert json.load(open(f"{priv}/uso.json"))["google"]["2026-10"] == 8   # alle :15 Google non è stato chiamato
 
@@ -321,7 +322,7 @@ def prova_apple_valico_in_richieste_separate():
         return 200, {"etas": [{**c, "destination": {"latitude": float(d.split(",")[0]), "longitude": float(d.split(",")[1])}}
                               for d in url.split("destinations=")[1].split("&")[0].split("|")]}
     rs = {r["misura"]: r for r in apple("t", chiama)}
-    assert all(rs[m[0]]["esito"] == "ok" for m in MISURE if m[3] == "tunnel")
+    assert all(rs[m[0]]["esito"] == "ok" for m in MISURE if m[3] != "passo")
     assert all(rs[m[0]]["esito"] == "errore 400" for m in MISURE if m[3] == "passo")
 
 def prova_giro_errore_a_meta_conta_le_quote():
@@ -408,6 +409,18 @@ def prova_tratteggio_strada_agli_svincoli():
     assert {round(float(y)) for _, y, _, _ in linee} == {Y_GALLERIA, Y_GALLERIA + CORSIA}
     assert svg.index('class="continua"') > svg.index('class="corsia-passo"')       # sopra le curve, altrimenti non si vede
 
+def prova_conviene_senza_erstfeld_biasca():
+    """Google non misura Erstfeld–Biasca (16.10): la riga usa Amsteg–Faido e lo dice."""
+    from pagina import conviene
+    assert conviene({"NS Amsteg-Faido tunnel": 40, "NS Amsteg-Faido passo": 55, "SN Faido-Amsteg tunnel": 60, "SN Faido-Amsteg passo": 50}) == \
+        "Adesso conviene (Amsteg–Faido): verso sud la galleria (40 min contro 55 del passo) · verso nord il passo (50 min contro 60 della galleria)"
+    assert conviene({"NS Erstfeld-Biasca tunnel": 50, "NS Amsteg-Faido tunnel": 40}).startswith("Adesso conviene: verso sud non si può dire")
+
+def prova_tolleranza_tratte_corte():
+    from archivio import risultato, controlla_distanza
+    assert controlla_distanza(risultato("NS Erstfeld-Amsteg", 300, 300, 8188))["esito"] == "ok"                 # TomTom, 0,8 km sotto Apple
+    assert controlla_distanza(risultato("NS Airolo-Faido", 1400, 1300, 30436))["esito"] == "percorso diverso"   # il giro di TomTom dal vecchio punto
+
 if __name__ == "__main__":
     prove = [(n, f) for n, f in sorted(globals().items()) if n.startswith("prova_") and callable(f)]
     falliti = 0
@@ -416,3 +429,4 @@ if __name__ == "__main__":
         except Exception: falliti += 1; print("NO  ", nome); traceback.print_exc()
     print(f"{len(prove) - falliti}/{len(prove)}")
     sys.exit(1 if falliti else 0)
+

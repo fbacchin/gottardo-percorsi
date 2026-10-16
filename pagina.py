@@ -187,23 +187,34 @@ PASSI_STORIA = 12                      # 3 ore di quarti d'ora
 def nome_mappa(quando, fonte):
     return f"mappe/{quando:%Y-%m-%d-%H%M}-{fonte}.svg"
 
+def _tratta(riga, totali):
+    """Erstfeld–Biasca, oppure Amsteg–Faido se la fonte non ha nessun dato della prima (Google dal 16.10)."""
+    ha = lambda t: any(_valore(riga or {}, _nome(s, t, p)) is not None or _nome(s, t, p) in (totali or {})
+                       for s in ("NS", "SN") for p in ("tunnel", "passo"))
+    return "corta" if not ha("lunga") and ha("corta") else "lunga"
+
+NOME_TRATTA = {"lunga": "Erstfeld–Biasca", "corta": "Amsteg–Faido"}
+
 def numeri_fonte(riga, totali):
-    """Righe di testo sotto la mappa: ritardo e tempo totale su Erstfeld–Biasca, per senso e percorso."""
-    out = []
+    """Righe di testo sotto la mappa: ritardo e tempo totale su Erstfeld–Biasca (o Amsteg–Faido), per senso e percorso."""
+    tratta, out = _tratta(riga, totali), []
     for senso, testo in (("NS", "verso sud"), ("SN", "verso nord")):
         parti = []
         for perc, nome_p in (("tunnel", "galleria"), ("passo", "passo")):
-            n = _nome(senso, "lunga", perc)
+            n = _nome(senso, tratta, perc)
             v, t = _valore(riga, n), (totali or {}).get(n)
             parti.append(f"{nome_p} " + ("nessun dato" if v is None else f"{'+' if v > 0 else ''}{v} min" + (f" · totale {t} min" if t is not None else "")))
-        out.append(f"Erstfeld–Biasca {testo}: " + "   |   ".join(parti))
+        out.append(f"{NOME_TRATTA[tratta]} {testo}: " + "   |   ".join(parti))
     return out
 
-def conviene(totali):
-    """Galleria o passo, con i tempi totali di una fonte su Erstfeld–Biasca. Differenza di un minuto o meno: fa lo stesso."""
+def conviene(totali, riga=None):
+    """Galleria o passo, con i tempi totali di una fonte su Erstfeld–Biasca. Differenza di un minuto o meno: fa lo stesso.
+    Google non misura Erstfeld–Biasca (16.10): si usa Amsteg–Faido, e lo si scrive."""
+    totali = totali or {}
+    tratta = _tratta(riga, totali)
     parti = []
     for senso, testo in (("NS", "verso sud"), ("SN", "verso nord")):
-        g, p = (totali or {}).get(_nome(senso, "lunga", "tunnel")), (totali or {}).get(_nome(senso, "lunga", "passo"))
+        g, p = totali.get(_nome(senso, tratta, "tunnel")), totali.get(_nome(senso, tratta, "passo"))
         if g is None or p is None:
             parti.append(f"{testo} non si può dire (manca il tempo {'della galleria' if g is None else 'del passo'})")
         elif abs(g - p) <= 1:
@@ -212,7 +223,7 @@ def conviene(totali):
             parti.append(f"{testo} la galleria ({g} min contro {p} del passo)")
         else:
             parti.append(f"{testo} il passo ({p} min contro {g} della galleria)")
-    return "Adesso conviene: " + " · ".join(parti)
+    return "Adesso conviene" + ("" if tratta == "lunga" else " (Amsteg–Faido)") + ": " + " · ".join(parti)
 
 def mappa_fonte(fonte, quando, riga=None, totali=None, ora_misura=None):
     etichetta = dict(FONTI_MAPPA)[fonte]
@@ -220,7 +231,7 @@ def mappa_fonte(fonte, quando, riga=None, totali=None, ora_misura=None):
     sotto = f"misura delle {ora_misura}" if ora_misura and ora_misura != f"{quando:%Y-%m-%d %H:%M}" else ""
     if riga is None:
         return mappa(titolo, {}, ["nessun dato in questo quarto d'ora"], sotto)
-    return mappa(titolo, situazione({fonte: riga}, fonte), [conviene(totali)] + numeri_fonte(riga, totali), sotto)
+    return mappa(titolo, situazione({fonte: riga}, fonte), [conviene(totali, riga)] + numeri_fonte(riga, totali), sotto)
 
 def pagine(adesso, esiste):
     """{percorso: testo markdown} per il README e le pagine storia/<minuti>.md; esiste(percorso) dice se una mappa c'è."""
